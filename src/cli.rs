@@ -43,8 +43,12 @@ pub enum Commands {
         name: String,
 
         /// Absolute path to the executable.
+        ///
+        /// Omit this flag to use the interactive process scanner: px will
+        /// snapshot running processes, prompt you to open the app, then
+        /// detect its path automatically from the new processes.
         #[arg(short, long)]
-        path: String,
+        path: Option<String>,
 
         /// Execution class: `cli` blocks the terminal; `desktop` detaches immediately.
         #[arg(short, long, value_enum, default_value_t = AppKind::Cli)]
