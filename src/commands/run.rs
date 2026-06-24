@@ -43,10 +43,14 @@ fn resolve_proxy_url(
         return Ok(url.to_string());
     }
 
-    let (user, pass) = credentials::get_proxy_credentials()?;
+    let creds = credentials::get_proxy_credentials()?;
+    
+    let host = creds.host.as_deref().unwrap_or(&cfg.proxy.host);
+    let port = creds.port.unwrap_or(cfg.proxy.port);
+
     Ok(format!(
         "http://{}:{}@{}:{}",
-        user, pass, cfg.proxy.host, cfg.proxy.port
+        creds.user, creds.pass, host, port
     ))
 }
 
