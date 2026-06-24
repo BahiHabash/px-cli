@@ -25,5 +25,7 @@ fn main() -> Result<()> {
         Commands::Register { name, path, kind } => commands::register::run(&name, path.as_deref(), kind),
         Commands::Run { shortcut, proxy_override } => commands::run::run(&shortcut, proxy_override),
         Commands::Check => commands::check::run(),
+        Commands::Alias { old_name, new_name } => commands::alias::run(&old_name, &new_name),
+        Commands::Edit => commands::edit::run(),
     }
 }

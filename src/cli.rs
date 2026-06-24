@@ -78,4 +78,19 @@ pub enum Commands {
     ///
     /// Exits with code 1 if any paths are broken — safe to use in CI scripts.
     Check,
+
+    /// Rename an existing registered shortcut.
+    ///
+    /// Examples:
+    ///   px alias old-name new-name
+    Alias {
+        /// The current name of the shortcut.
+        old_name: String,
+
+        /// The new name for the shortcut.
+        new_name: String,
+    },
+
+    /// Open `config.toml` in the default text editor for manual editing.
+    Edit,
 }
