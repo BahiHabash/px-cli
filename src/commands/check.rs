@@ -18,7 +18,7 @@
 use anyhow::Result;
 use colored::Colorize;
 
-use crate::config;
+use crate::{config, path_utils};
 
 /// Validate the config file and check that every registered path exists.
 pub fn run() -> Result<()> {
@@ -49,7 +49,8 @@ pub fn run() -> Result<()> {
     entries.sort_by_key(|(name, _)| name.as_str());
 
     for (name, entry) in &entries {
-        let path_exists = std::path::Path::new(&entry.path).exists();
+        let expanded_path = path_utils::expand_path(&entry.path);
+        let path_exists = expanded_path.exists();
 
         if path_exists {
             healthy += 1;
