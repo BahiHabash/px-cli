@@ -1,0 +1,34 @@
+[package]
+name = "px"
+version = "0.1.0"
+edition = "2021"
+description = "A high-performance proxy-injector and application launcher for internal development teams"
+authors = ["Internal Dev Team"]
+license = "MIT"
+
+# Optimise the release binary for size and speed
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[dependencies]
+# CLI argument parsing – derive API keeps everything declarative
+clap = { version = "4", features = ["derive"] }
+
+# Serialisation / deserialisation of config.toml
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# Cross-platform config-directory resolution (~/.config / %APPDATA%)
+dirs = "5"
+
+# Human-readable error handling and context propagation
+anyhow = "1"
+
+# Coloured terminal output for status messages
+colored = "2"
+
+# .env file parsing for runtime credential loading
+dotenvy = "0.15"
