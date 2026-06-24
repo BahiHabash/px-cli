@@ -37,15 +37,22 @@ use anyhow::{Context, Result};
 
 use crate::config;
 
+pub struct ProxyCredentials {
+    pub user: String,
+    pub pass: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+}
+
 /// Loads the `.env` file from the config directory and returns
-/// `(username, password)` for the proxy connection.
+/// proxy credentials and optional host/port overrides.
 ///
 /// # Errors
 ///
 /// Returns an error if:
 /// - The `.env` file cannot be found or read.
 /// - Either `PX_PROXY_USER` or `PX_PROXY_PASS` is missing from the file.
-pub fn get_proxy_credentials() -> Result<(String, String)> {
+pub fn get_proxy_credentials() -> Result<ProxyCredentials> {
     let env_file = config::env_path()?;
 
     // Load the .env file into the current process's environment.
@@ -76,5 +83,8 @@ pub fn get_proxy_credentials() -> Result<(String, String)> {
         )
     })?;
 
-    Ok((user, pass))
+    let host = std::env::var("PX_HOST").ok();
+    let port = std::env::var("PX_PORT").ok().and_then(|p| p.parse().ok());
+
+    Ok(ProxyCredentials { user, pass, host, port })
 }
