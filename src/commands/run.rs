@@ -17,44 +17,13 @@
 //! the `.env` credential loading and uses the provided URL as-is for all three
 //! proxy environment variables.
 
-use std::path::PathBuf;
 use std::process::{self, Stdio};
 
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-use crate::config::{self, AppKind};
-use crate::credentials;
-
-// ---------------------------------------------------------------------------
-// Windows path resolution
-// ---------------------------------------------------------------------------
-
-/// Resolves the executable path, applying a Windows-specific `.exe` / `.cmd`
-/// extension fallback when the bare path does not exist on disk.
-///
-/// On Linux and macOS the path is returned unchanged.
-fn resolve_exec_path(raw: &str) -> PathBuf {
-    let original = PathBuf::from(raw);
-
-    #[cfg(target_os = "windows")]
-    {
-        if original.exists() {
-            return original;
-        }
-        for ext in &["exe", "cmd"] {
-            let candidate = original.with_extension(ext);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-        // Return original and let the OS produce a meaningful error.
-        return original;
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    original
-}
+use crate::{config, credentials, path_utils};
+use crate::config::AppKind;
 
 // ---------------------------------------------------------------------------
 // Proxy URL resolution
@@ -98,8 +67,8 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         )
     })?;
 
-    // 2. Resolve executable path (Windows .exe / .cmd fallback).
-    let exec_path = resolve_exec_path(&entry.path);
+    // 2. Resolve executable path (expanding env vars and Windows .exe / .cmd fallback).
+    let exec_path = path_utils::resolve_exec_path(&entry.path);
 
     // 3. Resolve proxy URL — override wins over .env credentials.
     let using_override = proxy_override.is_some();
@@ -112,8 +81,12 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         Some(cfg.proxy.cert_path.as_str())
     };
 
-    // 5. Build the Command with inherited stdio and injected env vars.
+    // 5. Build the Command with inherited stdio, saved args, and injected env vars.
     let mut cmd = process::Command::new(&exec_path);
+    // Prepend any saved launch args (e.g. --disable-gpu captured by process scanner).
+    if !entry.args.is_empty() {
+        cmd.args(&entry.args);
+    }
     cmd.env("HTTP_PROXY", &proxy_url)
         .env("HTTPS_PROXY", &proxy_url)
         .env("ALL_PROXY", &proxy_url)
@@ -136,12 +109,19 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         String::new()
     };
 
+    let args_label = if entry.args.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", entry.args.join(" ")).dimmed().to_string()
+    };
+
     println!(
-        "{} Launching '{}' {}{}",
+        "{} Launching '{}' {}{}{}",
         "→".yellow().bold(),
         exec_path.display(),
         mode_label,
         override_label,
+        args_label,
     );
 
     // 7. Dispatch based on AppKind.
