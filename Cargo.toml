@@ -32,3 +32,6 @@ colored = "2"
 
 # .env file parsing for runtime credential loading
 dotenvy = "0.15"
+
+# Process listing for dynamic discovery fallback (px init process scanner)
+sysinfo = "0.30"
