@@ -92,7 +92,7 @@ pub struct Config {
 /// Per-application registration entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppEntry {
-    /// Absolute path to the executable.
+    /// Absolute path to the executable (may contain env-var tokens like %LOCALAPPDATA%).
     pub path: String,
 
     /// Execution class: `cli` (blocking) or `desktop` (detached).
@@ -100,6 +100,14 @@ pub struct AppEntry {
     /// Defaults to `cli` when absent from the config file.
     #[serde(default)]
     pub kind: AppKind,
+
+    /// Optional launch arguments appended to the executable on every run.
+    ///
+    /// Automatically populated by the dynamic process scanner when the app
+    /// was captured running with specific flags (e.g. `--disable-gpu`).
+    /// Empty by default; omitted from TOML when empty to keep the file clean.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
 }
 
 /// Proxy host, port and optional CA certificate settings.

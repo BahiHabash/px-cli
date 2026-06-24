@@ -10,6 +10,7 @@ mod cli;
 mod commands;
 mod config;
 mod credentials;
+mod path_utils;
 
 use anyhow::Result;
 use clap::Parser;
@@ -21,7 +22,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Init => commands::init::run(),
-        Commands::Register { name, path, kind } => commands::register::run(&name, &path, kind),
+        Commands::Register { name, path, kind } => commands::register::run(&name, path.as_deref(), kind),
         Commands::Run { shortcut, proxy_override } => commands::run::run(&shortcut, proxy_override),
         Commands::Check => commands::check::run(),
     }
