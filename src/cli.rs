@@ -35,8 +35,8 @@ pub enum Commands {
     /// Register (or update) a named shortcut pointing to an executable.
     ///
     /// Examples:
-    ///   px register --name cursor-desktop --path /Applications/Cursor.app/Contents/MacOS/Cursor --kind desktop
-    ///   px register --name codex-cli      --path /usr/local/bin/codex --kind cli
+    ///   px register --name cursor-desktop --path /Applications/Cursor.app/Contents/MacOS/Cursor --kind desktop --ai-only
+    ///   px register --name codex-cli      --path /usr/local/bin/codex --kind cli --ai-only
     Register {
         /// Short, memorable name used with `px run <name>`.
         #[arg(short, long)]
@@ -50,9 +50,25 @@ pub enum Commands {
         #[arg(short, long)]
         path: Option<String>,
 
+        /// Search running processes by name (case-insensitive) instead of using
+        /// the interactive snapshot scanner.
+        #[arg(short, long)]
+        search: Option<String>,
+
         /// Execution class: `cli` blocks the terminal; `desktop` detaches immediately.
         #[arg(short, long, value_enum, default_value_t = AppKind::Cli)]
         kind: AppKind,
+
+        /// Route only AI/LLM API traffic through the proxy.
+        ///
+        /// When set, `NO_PROXY` is automatically populated with a broad exclusion
+        /// list (localhost, npm, git, pip, crates.io …) so that only endpoints
+        /// like api.openai.com and api.anthropic.com go through the proxy.
+        /// All other traffic goes direct.
+        ///
+        /// Auto-enabled for Cursor and Codex entries discovered by `px init`.
+        #[arg(long, default_value_t = false)]
+        ai_only: bool,
     },
 
     /// Launch a registered application with proxy environment variables injected.

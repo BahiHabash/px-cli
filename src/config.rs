@@ -108,6 +108,15 @@ pub struct AppEntry {
     /// Empty by default; omitted from TOML when empty to keep the file clean.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
+
+    /// When `true`, the proxy is applied only for AI/LLM API hosts.
+    ///
+    /// `NO_PROXY` is automatically set to a broad exclusion list so that all
+    /// non-AI traffic (npm, git, pip, health-checks, etc.) bypasses the proxy
+    /// and goes direct.  Set automatically for Cursor and Codex entries during
+    /// `px init`; toggle manually with `px register --ai-only`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ai_only_proxy: bool,
 }
 
 /// Proxy host, port and optional CA certificate settings.
@@ -125,6 +134,14 @@ pub struct ProxyConfig {
     /// Electron-based apps (Cursor, VS Code …) trust the intercepting proxy.
     #[serde(default)]
     pub cert_path: String,
+
+    /// Additional hosts / domains to exclude from the proxy when `ai_only_proxy`
+    /// is active.  These are merged with the built-in baseline (localhost,
+    /// common registries, Git forges) produced by the `no_proxy` module.
+    ///
+    /// Example: `["registry.company.internal", "git.company.internal"]`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub no_proxy_extra: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +155,7 @@ impl Default for Config {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
                 cert_path: String::new(),
+                no_proxy_extra: vec![],
             },
             apps: HashMap::new(),
         }

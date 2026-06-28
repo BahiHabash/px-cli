@@ -83,12 +83,18 @@ pub fn run() -> Result<()> {
                 );
                 skipped += 1;
             } else {
+                let ai_label = if app.entry.ai_only_proxy {
+                    format!(" {}", "[ai-only]".cyan().bold())
+                } else {
+                    String::new()
+                };
                 println!(
-                    "  {} Found '{}' → {} ({})",
+                    "  {} Found '{}' → {} ({}){}",
                     "✔".green().bold(),
                     app.shortcut.cyan(),
                     app.entry.path,
-                    app.entry.kind.to_string().dimmed()
+                    app.entry.kind.to_string().dimmed(),
+                    ai_label,
                 );
                 cfg.apps.insert(app.shortcut.to_string(), app.entry);
                 added += 1;

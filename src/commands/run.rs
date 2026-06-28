@@ -1,28 +1,47 @@
 //! commands/run.rs — Handler for `px run`.
 //!
 //! Resolves a registered shortcut, obtains proxy credentials (either from
-//! `.env` or a runtime override), injects environment variables, and spawns
-//! the target process.
+//! `.env` or a runtime override), builds the appropriate env-var set, and
+//! spawns the target process **via the platform shell**.
+//!
+//! ## Shell-wrapper execution model
+//!
+//! Every app is launched through a single terminal layer:
+//!
+//! | Platform | Shell    | Mechanism                    |
+//! |----------|----------|------------------------------|
+//! | Unix     | `/bin/sh`| `VAR="v" exec <app> <args>`  |
+//! | Windows  | `cmd`    | `set VAR=v&& <app> <args>`   |
+//!
+//! On Unix, `exec` replaces the shell process so no extra PID is left behind.
+//! On Windows, `cmd /c` exits as soon as the child returns.
 //!
 //! ## Execution class dispatch
 //!
-//! | `AppKind`   | Behaviour                                                  |
-//! |-------------|------------------------------------------------------------|
-//! | `Cli`       | Block until child exits; propagate exit code to the shell  |
-//! | `Desktop`   | Spawn and return immediately — terminal stays free         |
+//! | `AppKind` | Behaviour                                                  |
+//! |-----------|------------------------------------------------------------|
+//! | `Cli`     | Block until child exits; propagate exit code to the shell  |
+//! | `Desktop` | Spawn and return immediately — terminal stays free         |
+//!
+//! ## Proxy mode
+//!
+//! | `ai_only_proxy` | Env-vars set                                      |
+//! |-----------------|---------------------------------------------------|
+//! | `false`         | `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`          |
+//! | `true`          | Same + `NO_PROXY` / `no_proxy` exclusion list     |
 //!
 //! ## Proxy override
 //!
-//! Passing `--proxy-override http://user:pass@host:port` completely bypasses
-//! the `.env` credential loading and uses the provided URL as-is for all three
-//! proxy environment variables.
+//! `--proxy-override http://user:pass@host:port` completely bypasses `.env`
+//! credential loading and uses the provided URL as-is for all three proxy
+//! environment variables.
 
 use std::process::{self, Stdio};
 
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-use crate::{config, credentials, path_utils};
+use crate::{config, credentials, no_proxy, path_utils, shell};
 use crate::config::AppKind;
 
 // ---------------------------------------------------------------------------
@@ -32,7 +51,7 @@ use crate::config::AppKind;
 /// Returns the proxy URL to inject.
 ///
 /// - If `proxy_override` is `Some`, it is used as-is (credentials from `.env`
-///   are **not** loaded — this is the anti-reversing guardrail).
+///   are **not** loaded — this is the anti-credential-leak guardrail).
 /// - Otherwise, credentials are loaded from the `.env` file and combined with
 ///   the host/port from `config.toml`.
 fn resolve_proxy_url(
@@ -44,7 +63,7 @@ fn resolve_proxy_url(
     }
 
     let creds = credentials::get_proxy_credentials()?;
-    
+
     let host = creds.host.as_deref().unwrap_or(&cfg.proxy.host);
     let port = creds.port.unwrap_or(cfg.proxy.port);
 
@@ -58,7 +77,7 @@ fn resolve_proxy_url(
 // Command handler
 // ---------------------------------------------------------------------------
 
-/// Inject proxy env vars and spawn the registered application.
+/// Inject proxy env vars via a shell wrapper and spawn the registered app.
 pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
     let cfg = config::load()?;
 
@@ -85,34 +104,52 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         Some(cfg.proxy.cert_path.as_str())
     };
 
-    // 5. Build the Command with inherited stdio, saved args, and injected env vars.
-    let mut cmd = process::Command::new(&exec_path);
-    // Prepend any saved launch args (e.g. --disable-gpu captured by process scanner).
-    if !entry.args.is_empty() {
-        cmd.args(&entry.args);
+    // 5. Build the env-var list to inject.
+    //
+    //    AI-only mode: also set NO_PROXY / no_proxy so that everything except
+    //    LLM API hosts bypasses the proxy.  The shell-wrapper then exports all
+    //    of these before exec-ing the target app.
+    let mut env_vars: Vec<(&str, String)> = vec![
+        ("HTTP_PROXY",  proxy_url.clone()),
+        ("HTTPS_PROXY", proxy_url.clone()),
+        ("ALL_PROXY",   proxy_url.clone()),
+    ];
+
+    if entry.ai_only_proxy {
+        let np = no_proxy::build_no_proxy(&cfg.proxy.no_proxy_extra);
+        env_vars.push(("NO_PROXY", np.clone()));
+        env_vars.push(("no_proxy", np));          // lowercase alias for curl/wget
     }
-    cmd.env("HTTP_PROXY", &proxy_url)
-        .env("HTTPS_PROXY", &proxy_url)
-        .env("ALL_PROXY", &proxy_url)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
 
     if let Some(cert) = cert_path {
-        cmd.env("NODE_EXTRA_CA_CERTS", cert);
+        env_vars.push(("NODE_EXTRA_CA_CERTS", cert.to_string()));
     }
 
-    // 6. Status line before launch.
+    // Convert to &str slices for the shell builder.
+    let env_refs: Vec<(&str, &str)> = env_vars
+        .iter()
+        .map(|(k, v)| (*k, v.as_str()))
+        .collect();
+
+    // 6. Build the shell invocation (sh -c / cmd /c).
+    let detach = entry.kind == AppKind::Desktop;
+    let invocation = shell::build(&exec_path, &entry.args, &env_refs, detach);
+
+    // 7. Status line before launch.
     let mode_label = match entry.kind {
         AppKind::Desktop => "detached".dimmed(),
-        AppKind::Cli => "blocking".dimmed(),
+        AppKind::Cli     => "blocking".dimmed(),
+    };
+    let proxy_mode_label = if entry.ai_only_proxy {
+        " [ai-only]".cyan().bold().to_string()
+    } else {
+        String::new()
     };
     let override_label = if using_override {
         " [proxy-override]".yellow().bold().to_string()
     } else {
         String::new()
     };
-
     let args_label = if entry.args.is_empty() {
         String::new()
     } else {
@@ -120,19 +157,28 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
     };
 
     println!(
-        "{} Launching '{}' {}{}{}",
+        "{} Launching '{}' {}{}{}{}",
         "→".yellow().bold(),
         exec_path.display(),
         mode_label,
+        proxy_mode_label,
         override_label,
         args_label,
     );
 
-    // 7. Dispatch based on AppKind.
+    // 8. Build the underlying Command from the shell invocation.
+    let mut cmd = process::Command::new(&invocation.shell);
+    cmd.args(&invocation.shell_args)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    // 9. Dispatch based on AppKind.
     match entry.kind {
         AppKind::Desktop => {
             // Spawn and return immediately — the child owns its own lifecycle.
-            // Dropping the `Child` handle without calling `.wait()` detaches it.
+            // On Unix the shell exec-replaces itself with the app, so dropping
+            // the Child handle here correctly detaches the app process.
             cmd.spawn().with_context(|| {
                 format!(
                     "Failed to launch '{}'. Check the path is correct and executable.",

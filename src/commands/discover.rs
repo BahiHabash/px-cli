@@ -46,6 +46,14 @@ pub struct DiscoveredApp {
     pub entry: AppEntry,
 }
 
+/// Returns `true` if the shortcut belongs to an AI coding tool (Cursor, Codex).
+///
+/// These tools receive `ai_only_proxy = true` automatically during discovery
+/// so that only LLM API traffic is routed through the proxy.
+fn is_ai_tool(shortcut: &str) -> bool {
+    shortcut.starts_with("cursor") || shortcut.starts_with("codex")
+}
+
 // ---------------------------------------------------------------------------
 // Static scan — internal types
 // ---------------------------------------------------------------------------
@@ -97,6 +105,10 @@ fn candidates() -> Vec<Candidate> {
             paths: vec![
                 p("/usr/local/bin/cursor"),
                 p("/opt/homebrew/bin/cursor"),
+                (
+                    "~/.local/bin/cursor".to_string(),
+                    dirs::home_dir().unwrap_or_default().join(".local/bin/cursor")
+                ),
             ],
         },
         Candidate {
@@ -110,12 +122,19 @@ fn candidates() -> Vec<Candidate> {
             paths: vec![
                 p("/usr/local/bin/codex"),
                 p("/opt/homebrew/bin/codex"),
+                (
+                    "~/.local/bin/codex".to_string(),
+                    dirs::home_dir().unwrap_or_default().join(".local/bin/codex")
+                ),
             ],
         },
         Candidate {
-            shortcut: "antigravity",
+            shortcut: "antigravity-ide",
             kind: AppKind::Desktop,
-            paths: vec![p("/Applications/Antigravity.app/Contents/MacOS/Antigravity")],
+            paths: vec![
+                p("/Applications/Antigravity IDE.app/Contents/MacOS/Electron"),
+                p("/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE"),
+            ],
         },
     ]
 }
@@ -197,12 +216,12 @@ fn candidates() -> Vec<Candidate> {
             ],
         },
         Candidate {
-            shortcut: "antigravity",
+            shortcut: "antigravity-ide",
             kind: AppKind::Desktop,
             paths: vec![
-                lp(r"%LOCALAPPDATA%", r"Programs\antigravity\Antigravity.exe"),
-                lp(r"%LOCALAPPDATA%", r"Programs\Antigravity\Antigravity.exe"),
-                pp(r"%ProgramFiles%", r"Antigravity\Antigravity.exe"),
+                lp(r"%LOCALAPPDATA%", r"Programs\antigravity ide\Antigravity IDE.exe"),
+                lp(r"%LOCALAPPDATA%", r"Programs\Antigravity IDE\Antigravity IDE.exe"),
+                pp(r"%ProgramFiles%", r"Antigravity IDE\Antigravity IDE.exe"),
             ],
         },
     ]
@@ -243,6 +262,10 @@ fn candidates() -> Vec<Candidate> {
             paths: vec![
                 p("/usr/local/bin/cursor"),
                 p("/usr/bin/cursor"),
+                (
+                    "~/.local/bin/cursor".to_string(),
+                    dirs::home_dir().unwrap_or_default().join(".local/bin/cursor")
+                ),
             ],
         },
         Candidate {
@@ -256,14 +279,18 @@ fn candidates() -> Vec<Candidate> {
             paths: vec![
                 p("/usr/local/bin/codex"),
                 p("/usr/bin/codex"),
+                (
+                    "~/.local/bin/codex".to_string(),
+                    dirs::home_dir().unwrap_or_default().join(".local/bin/codex")
+                ),
             ],
         },
         Candidate {
-            shortcut: "antigravity",
+            shortcut: "antigravity-ide",
             kind: AppKind::Desktop,
             paths: vec![
-                p("/opt/antigravity/antigravity"),
-                p("/usr/local/bin/antigravity"),
+                p("/opt/antigravity-ide/antigravity-ide"),
+                p("/usr/local/bin/antigravity-ide"),
             ],
         },
     ]
@@ -310,12 +337,20 @@ fn static_scan() -> Vec<DiscoveredApp> {
 
             let template = found_template?;
 
+            // Cursor and Codex entries automatically use AI-only proxy mode:
+            // only LLM API endpoints are routed through the proxy.
+            let ai_only_proxy = is_ai_tool(candidate.shortcut);
+            if ai_only_proxy {
+                println!("      {} ai-only proxy mode enabled", "★".cyan());
+            }
+
             Some(DiscoveredApp {
                 shortcut: candidate.shortcut,
                 entry: AppEntry {
                     path: template,
                     kind: candidate.kind,
                     args: vec![],
+                    ai_only_proxy,
                 },
             })
         })
@@ -347,10 +382,10 @@ struct CoreApp {
 }
 
 static CORE_APPS: &[CoreApp] = &[
-    CoreApp { shortcut: "vscode-desktop",  exe_name: "code",        kind: AppKind::Desktop },
-    CoreApp { shortcut: "cursor-desktop",  exe_name: "cursor",      kind: AppKind::Desktop },
-    CoreApp { shortcut: "codex-desktop",   exe_name: "codex",       kind: AppKind::Desktop },
-    CoreApp { shortcut: "antigravity",     exe_name: "antigravity", kind: AppKind::Desktop },
+    CoreApp { shortcut: "vscode-desktop",  exe_name: "code",            kind: AppKind::Desktop },
+    CoreApp { shortcut: "cursor-desktop",  exe_name: "cursor",          kind: AppKind::Desktop },
+    CoreApp { shortcut: "codex-desktop",   exe_name: "codex",           kind: AppKind::Desktop },
+    CoreApp { shortcut: "antigravity-ide", exe_name: "antigravity ide", kind: AppKind::Desktop },
 ];
 
 /// On Windows, detects whether a process path is the ACL-locked internal
@@ -393,16 +428,25 @@ fn process_scan(missing: &[&CoreApp]) -> Vec<DiscoveredApp> {
             let name_lower = process.name().to_lowercase();
             let name_stem  = name_lower.trim_end_matches(".exe");
 
-            if name_stem != core_app.exe_name {
+            let Some(exe_path) = process.exe() else { continue };
+
+            let path_lower = exe_path.to_string_lossy().to_lowercase();
+            let exe_matches = path_lower.contains(core_app.exe_name);
+
+            if !name_stem.contains(core_app.exe_name) && !exe_matches {
                 continue;
             }
-
-            let Some(exe_path) = process.exe() else { continue };
 
             // ── Electron subprocess guard ────────────────────────────────────
             // See `is_electron_subprocess` for full explanation.
             // Check before collecting args to skip the Vec allocation entirely.
             if is_electron_subprocess(process) {
+                continue;
+            }
+
+            // Additional guard for macOS: Electron helper processes sometimes lack --type=
+            // when spawning node child processes.
+            if exe_path.to_string_lossy().contains("Helper") {
                 continue;
             }
 
@@ -460,12 +504,21 @@ fn process_scan(missing: &[&CoreApp]) -> Vec<DiscoveredApp> {
                 format!("  args: {}", format!("[{}]", args.join(", ")).yellow())
             };
 
+            // Cursor and Codex entries get AI-only proxy mode automatically.
+            let ai_only_proxy = is_ai_tool(core_app.shortcut);
+            let ai_label = if ai_only_proxy {
+                format!(" {}", "[ai-only]".cyan())
+            } else {
+                String::new()
+            };
+
             println!(
-                "    {} {} → {}{}",
+                "    {} {} → {}{}{}",
                 "✔".green().bold(),
                 core_app.shortcut.cyan(),
                 path_to_save.dimmed(),
-                args_label
+                args_label,
+                ai_label,
             );
 
             results.push(DiscoveredApp {
@@ -474,6 +527,7 @@ fn process_scan(missing: &[&CoreApp]) -> Vec<DiscoveredApp> {
                     path: path_to_save,
                     kind: core_app.kind,
                     args,
+                    ai_only_proxy,
                 },
             });
 

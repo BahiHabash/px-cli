@@ -1,7 +1,7 @@
 //! commands/register.rs — Handler for `px register`.
 //!
-//! Upserts a named shortcut entry (path + execution class) into the `[apps]`
-//! table of `config.toml`.
+//! Upserts a named shortcut entry (path + execution class + ai_only_proxy)
+//! into the `[apps]` table of `config.toml`.
 //!
 //! ## Two usage modes
 //!
@@ -35,10 +35,14 @@ use crate::config::{self, AppEntry, AppKind};
 /// Add or update an app shortcut in `config.toml`.
 ///
 /// `path = None` triggers the interactive process scanner.
-pub fn run(name: &str, path: Option<&str>, kind: AppKind) -> Result<()> {
+/// `ai_only` sets `ai_only_proxy = true` on the entry.
+pub fn run(name: &str, path: Option<&str>, search: Option<&str>, kind: AppKind, ai_only: bool) -> Result<()> {
     let resolved_path = match path {
         Some(p) => p.to_string(),
-        None    => interactive_pick(name)?,
+        None => match search {
+            Some(q) => search_running_processes(q)?,
+            None => interactive_pick(name)?,
+        },
     };
 
     let mut cfg = config::load()?;
@@ -50,18 +54,25 @@ pub fn run(name: &str, path: Option<&str>, kind: AppKind) -> Result<()> {
             path: resolved_path.clone(),
             kind,
             args: vec![],
+            ai_only_proxy: ai_only,
         },
     );
     config::save(&cfg)?;
 
     let action = if is_update { "Updated" } else { "Registered" };
+    let ai_label = if ai_only {
+        format!(" {}", "[ai-only]".cyan().bold())
+    } else {
+        String::new()
+    };
     println!(
-        "\n{} {} '{}' → '{}' ({})",
+        "\n{} {} '{}' → '{}' ({}){}",
         "✔".green().bold(),
         action,
         name.cyan(),
         resolved_path,
         kind.to_string().dimmed(),
+        ai_label,
     );
 
     Ok(())
@@ -112,16 +123,25 @@ fn interactive_pick(name_hint: &str) -> Result<String> {
     // ── Fallback: if nothing new appeared (app was already running) ───────────
     let was_already_running = candidates.is_empty();
     if was_already_running {
+        let fallback_query = name_hint.split(|c| c == '-' || c == '_').next().unwrap_or(name_hint).to_lowercase();
+        
         println!(
-            "  {} No new processes detected — the app may already have been open.\n  {} Showing all running apps instead:\n",
+            "  {} No new processes detected — the app may already have been open.\n  {} Automatically searching running apps for '{}':\n",
             "ℹ".cyan(),
             "→".yellow(),
+            fallback_query
         );
         candidates = sys
             .processes()
             .values()
             .filter(|p| !is_electron_subprocess(p))
             .filter(|p| p.exe().is_some())
+            .filter(|p| !p.exe().unwrap().to_string_lossy().contains("Helper"))
+            .filter(|p| {
+                let n = p.name().to_lowercase();
+                let e = p.exe().unwrap().to_string_lossy().to_lowercase();
+                n.contains(&fallback_query) || e.contains(&fallback_query)
+            })
             .collect();
     }
 
@@ -150,6 +170,75 @@ fn interactive_pick(name_hint: &str) -> Result<String> {
     }
 
     // ── Step 5: read and validate the user's choice ───────────────────────────
+    println!();
+    print!(
+        "  Enter number to select (or {} to cancel): ",
+        "0".dimmed()
+    );
+    io::stdout().flush().ok();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).ok();
+    let choice: usize = input.trim().parse().unwrap_or(0);
+
+    if choice == 0 || choice > candidates.len() {
+        bail!("Cancelled.");
+    }
+
+    let selected = candidates[choice - 1];
+    Ok(selected.exe().unwrap().to_string_lossy().into_owned())
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Search process scanner
+// ---------------------------------------------------------------------------
+
+/// Scan running processes and filter by a search query (case-insensitive)
+fn search_running_processes(query: &str) -> Result<String> {
+    println!(
+        "{} Searching running processes for '{}' …\n",
+        "⟳".yellow().bold(),
+        query.cyan()
+    );
+
+    let sys = System::new_all();
+    let query_lower = query.to_lowercase();
+
+    let mut candidates: Vec<_> = sys
+        .processes()
+        .values()
+        .filter(|p| !is_electron_subprocess(p))
+        .filter(|p| p.exe().is_some())
+        .filter(|p| !p.exe().unwrap().to_string_lossy().contains("Helper"))
+        .filter(|p| {
+            let n = p.name().to_lowercase();
+            let e = p.exe().unwrap().to_string_lossy().to_lowercase();
+            n.contains(&query_lower) || e.contains(&query_lower)
+        })
+        .collect();
+
+    if candidates.is_empty() {
+        bail!("No running processes found matching '{}'. Make sure the app is running.", query);
+    }
+
+    // Sort alphabetically for a stable, readable list.
+    candidates.sort_by_key(|p| p.name().to_lowercase());
+
+    let name_col = candidates
+        .iter()
+        .map(|p| p.name().len())
+        .max()
+        .unwrap_or(12);
+
+    for (i, proc) in candidates.iter().enumerate() {
+        println!(
+            "    {} {:<name_col$}  {}",
+            format!("[{}]", i + 1).bold(),
+            proc.name().cyan(),
+            proc.exe().unwrap().display().to_string().dimmed(),
+            name_col = name_col,
+        );
+    }
+
     println!();
     print!(
         "  Enter number to select (or {} to cancel): ",
