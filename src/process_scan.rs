@@ -232,10 +232,9 @@ mod tests {
 
     #[test]
     fn relative_process_paths_are_joined_to_cwd() {
-        let result = normalize_process_path(
-            Path::new("target/release/px"),
-            Some(Path::new("/Users/example/project")),
-        );
-        assert_eq!(result, "/Users/example/project/target/release/px");
+        let cwd = Path::new("/Users/example/project");
+        let relative = Path::new("target/release/px");
+        let result = normalize_process_path(relative, Some(cwd));
+        assert_eq!(result, cwd.join(relative).to_string_lossy());
     }
 }
