@@ -4,6 +4,22 @@
 
 ## How to install
 
+Recommended installer:
+
+macOS/Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BahiHabash/px-cli/main/scripts/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+iwr https://raw.githubusercontent.com/BahiHabash/px-cli/main/scripts/install.ps1 -UseB | iex
+```
+
+Manual install:
+
 Download the binary for your platform from this release:
 
 - Linux: `px-linux`

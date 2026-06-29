@@ -15,6 +15,24 @@
 
 ## Setup & Installation
 
+### Recommended Installer
+
+macOS/Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BahiHabash/px-cli/main/scripts/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+iwr https://raw.githubusercontent.com/BahiHabash/px-cli/main/scripts/install.ps1 -UseB | iex
+```
+
+The installers download the right release asset, install it as `px`, and use `~/.local/bin` by default.
+
+### Manual Install
+
 1. **Install a release binary**: Download the binary for your platform from the GitHub release and place it somewhere in your `PATH`.
    - Linux: rename `px-linux` to `px`
    - macOS Apple Silicon: rename `px-mac-silicon` to `px`
