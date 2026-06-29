@@ -30,6 +30,7 @@ Typical AI shortcuts discovered by `px init` include `cursor-d`, `cursor`, `code
 - This release is SOCKS5-first. Credential-based runs generate proxy URLs like `socks5://user:pass@host:port`.
 - `px` is mainly designed to handle AI work in developer tools by routing LLM/API traffic through a proxy.
 - It does not provide full IDE control, does not cover every IDE action, and does not currently support MCP server routing or IDE extension marketplace workflows as first-class features.
+- Some external network actions may not work 100% correctly yet, especially remote workflows such as `git push`, Git remote operations, and other tool-specific background network calls.
 
 ## Changes
 

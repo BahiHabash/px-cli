@@ -91,6 +91,8 @@ px credentials show
 
 The tool is mainly designed to handle AI work in developer tools: routing LLM/API traffic while keeping package managers, Git forges, local services, and normal development traffic direct where possible. It does not provide full IDE control, does not proxy every IDE action, and does not currently support MCP server routing or IDE extension marketplace workflows as first-class features.
 
+Some external network actions may not work 100% correctly through this setup yet, especially remote workflows such as `git push`, Git remote operations, and other tool-specific background network calls.
+
 ### Managing Shortcuts
 
 **Register a new app:**
