@@ -114,6 +114,13 @@ pub enum Commands {
         known: bool,
     },
 
+    /// Print the constructed proxy URL and where its host/port came from.
+    Proxy {
+        /// Show the raw proxy URL, including the password.
+        #[arg(long, default_value_t = false)]
+        show_secret: bool,
+    },
+
     /// Rename an existing registered shortcut.
     ///
     /// Examples:

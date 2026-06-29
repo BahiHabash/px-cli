@@ -46,8 +46,9 @@ pub fn run() -> Result<()> {
         let template = "# px credentials — keep this file out of version control\n\
                         PX_PROXY_USER=your_username\n\
                         PX_PROXY_PASS=your_password\n\
-                        PX_HOST=127.0.0.1\n\
-                        PX_PORT=8080\n";
+                        # Optional overrides. Leave commented to use config.toml [proxy].\n\
+                        # PX_HOST=127.0.0.1\n\
+                        # PX_PORT=8080\n";
         std::fs::write(&env_path, template)
             .with_context(|| format!("Failed to write .env to '{}'", env_path.display()))?;
         println!(

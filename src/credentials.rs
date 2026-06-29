@@ -33,7 +33,7 @@
 //! }
 //! ```
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::config;
 
@@ -42,6 +42,13 @@ pub struct ProxyCredentials {
     pub pass: String,
     pub host: Option<String>,
     pub port: Option<u16>,
+}
+
+pub struct ResolvedProxyUrl {
+    pub url: String,
+    pub masked_url: String,
+    pub host_source: &'static str,
+    pub port_source: &'static str,
 }
 
 /// Loads the `.env` file from the config directory and returns
@@ -83,8 +90,37 @@ pub fn get_proxy_credentials() -> Result<ProxyCredentials> {
         )
     })?;
 
+    if user == "your_username" || pass == "your_password" {
+        bail!(
+            "Proxy credentials in '{}' still contain template placeholder values. \
+             Set PX_PROXY_USER and PX_PROXY_PASS before running apps.",
+            env_file.display()
+        );
+    }
+
     let host = std::env::var("PX_HOST").ok();
     let port = std::env::var("PX_PORT").ok().and_then(|p| p.parse().ok());
 
     Ok(ProxyCredentials { user, pass, host, port })
+}
+
+/// Builds the same proxy URL used by `px run`, plus redacted diagnostics.
+pub fn resolve_proxy_url(cfg: &config::Config) -> Result<ResolvedProxyUrl> {
+    let creds = get_proxy_credentials()?;
+
+    let (host, host_source) = match creds.host.as_deref() {
+        Some(host) => (host, ".env PX_HOST"),
+        None => (cfg.proxy.host.as_str(), "config.toml proxy.host"),
+    };
+    let (port, port_source) = match creds.port {
+        Some(port) => (port, ".env PX_PORT"),
+        None => (cfg.proxy.port, "config.toml proxy.port"),
+    };
+
+    Ok(ResolvedProxyUrl {
+        url: format!("http://{}:{}@{}:{}", creds.user, creds.pass, host, port),
+        masked_url: format!("http://{}:<redacted>@{}:{}", creds.user, host, port),
+        host_source,
+        port_source,
+    })
 }

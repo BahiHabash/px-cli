@@ -62,15 +62,7 @@ fn resolve_proxy_url(
         return Ok(url.to_string());
     }
 
-    let creds = credentials::get_proxy_credentials()?;
-
-    let host = creds.host.as_deref().unwrap_or(&cfg.proxy.host);
-    let port = creds.port.unwrap_or(cfg.proxy.port);
-
-    Ok(format!(
-        "http://{}:{}@{}:{}",
-        creds.user, creds.pass, host, port
-    ))
+    Ok(credentials::resolve_proxy_url(cfg)?.url)
 }
 
 // ---------------------------------------------------------------------------

@@ -280,7 +280,12 @@ fn path_candidates_for(shortcut: &str) -> Vec<PathCandidate> {
     {
         match shortcut {
             "vscode-desktop" => vec![
+                p("/Applications/Visual Studio Code.app/Contents/MacOS/Code"),
                 p("/Applications/Visual Studio Code.app/Contents/MacOS/Electron"),
+                home_path(
+                    "~/Applications/Visual Studio Code.app/Contents/MacOS/Code",
+                    "Applications/Visual Studio Code.app/Contents/MacOS/Code",
+                ),
                 home_path(
                     "~/Applications/Visual Studio Code.app/Contents/MacOS/Electron",
                     "Applications/Visual Studio Code.app/Contents/MacOS/Electron",
