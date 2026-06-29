@@ -4,7 +4,7 @@
 //! process scanning, and `px register --search` all use these definitions so
 //! app identity, aliases, defaults, and known install paths stay consistent.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::AppKind;
 
@@ -35,10 +35,9 @@ impl AppDefinition {
         let name = normalize_match_text(process_name);
         let path = normalize_match_text(exe_path);
 
-        self.aliases.iter().any(|alias| {
-            let alias = normalize_match_text(alias);
-            !alias.is_empty() && (name.contains(&alias) || path.contains(&alias))
-        })
+        self.aliases
+            .iter()
+            .any(|alias| alias_matches(&name, &path, alias))
     }
 
     /// Returns known install paths for this app on the current platform.
@@ -53,7 +52,7 @@ pub const KNOWN_APPS: &[AppDefinition] = &[
     AppDefinition {
         shortcut: "vscode-desktop",
         display_name: "Visual Studio Code",
-        aliases: &["code", "visual studio code", "vscode", "electron"],
+        aliases: &["code", "visual studio code", "vscode"],
         kind: AppKind::Desktop,
         ai_only_proxy: false,
     },
@@ -150,6 +149,36 @@ fn normalize_match_text(raw: &str) -> String {
         .replace(".bat", "")
         .replace('-', " ")
         .replace('_', " ")
+}
+
+fn alias_matches(process_name: &str, exe_path: &str, alias: &str) -> bool {
+    let alias = normalize_match_text(alias);
+    if alias.is_empty() {
+        return false;
+    }
+
+    if alias.contains(' ') {
+        return process_name.contains(&alias) || exe_path.contains(&alias);
+    }
+
+    process_tokens(process_name)
+        .into_iter()
+        .chain(process_tokens(executable_name(exe_path)))
+        .any(|token| token == alias)
+}
+
+fn executable_name(exe_path: &str) -> &str {
+    Path::new(exe_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(exe_path)
+}
+
+fn process_tokens(raw: &str) -> Vec<String> {
+    raw.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .map(|part| part.to_string())
+        .collect()
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -385,5 +414,30 @@ mod tests {
         assert!(is_ai_tool("cursor-desktop"));
         assert!(is_ai_tool("my-antigravity-wrapper"));
         assert!(!is_ai_tool("vscode-desktop"));
+    }
+
+    #[test]
+    fn short_aliases_require_token_boundaries() {
+        assert!(identify_process(
+            "Code",
+            "/Applications/Visual Studio Code.app/Contents/MacOS/Code"
+        )
+        .is_some());
+        assert_eq!(
+            identify_process("codex", "/Users/me/.local/bin/codex")
+                .expect("codex should be known")
+                .shortcut,
+            "codex-desktop"
+        );
+        assert!(identify_process(
+            "node_repl",
+            "/Applications/Codex.app/Contents/Resources/cua_node/bin/node_repl"
+        )
+        .is_none());
+        assert!(
+            identify_process("PasscodeSettingsSubscriber", "/System/PasscodeSettingsSubscriber")
+                .is_none()
+        );
+        assert!(identify_process("VTDecoderXPCService", "/System/VTDecoderXPCService").is_none());
     }
 }

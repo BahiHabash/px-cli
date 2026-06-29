@@ -6,6 +6,7 @@
 //! process manager exposes an unlaunchable binary.
 
 use std::collections::HashSet;
+use std::path::Path;
 
 use sysinfo::{Pid, Process, System};
 
@@ -33,7 +34,7 @@ impl ProcessMatch {
 
         let exe = process.exe()?;
         let process_name = process.name().to_string();
-        let raw_path = exe.to_string_lossy().into_owned();
+        let raw_path = normalize_process_path(exe, process.cwd());
         let detected = app_registry::identify_process(&process_name, &raw_path);
         let path = launchable_path(&raw_path, detected);
         let args = process.cmd().iter().skip(1).cloned().collect();
@@ -164,6 +165,17 @@ where
     processes
 }
 
+fn normalize_process_path(exe_path: &Path, cwd: Option<&Path>) -> String {
+    if exe_path.is_absolute() {
+        return exe_path.to_string_lossy().into_owned();
+    }
+
+    cwd.unwrap_or_else(|| Path::new(""))
+        .join(exe_path)
+        .to_string_lossy()
+        .into_owned()
+}
+
 #[cfg(target_os = "windows")]
 pub fn is_locked_store_path(path_lower: &str) -> bool {
     path_lower.contains("\\windowsapps\\")
@@ -214,5 +226,14 @@ mod tests {
         assert!(!is_locked_store_path(
             r"c:\program files\windowsapps\codex.exe"
         ));
+    }
+
+    #[test]
+    fn relative_process_paths_are_joined_to_cwd() {
+        let result = normalize_process_path(
+            Path::new("target/release/px"),
+            Some(Path::new("/Users/example/project")),
+        );
+        assert_eq!(result, "/Users/example/project/target/release/px");
     }
 }
