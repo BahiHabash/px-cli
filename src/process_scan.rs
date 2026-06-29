@@ -210,8 +210,10 @@ fn launchable_path(raw_path: &str, detected: Option<&AppDefinition>) -> String {
 #[cfg(target_os = "windows")]
 fn windows_store_alias(shortcut: &str) -> Option<&'static str> {
     match shortcut {
-        "vscode-desktop" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\code.exe"),
-        "codex-desktop" | "codex-cli" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\codex.exe"),
+        "vscode-d" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\code.exe"),
+        "codex-d" | "codex" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\codex.exe"),
+        "kiro-d" | "kiro" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\kiro.exe"),
+        "claude-d" | "claude" => Some(r"%LOCALAPPDATA%\Microsoft\WindowsApps\claude.exe"),
         _ => None,
     }
 }

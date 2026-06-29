@@ -7,7 +7,7 @@
 //!
 //! **Explicit path** (`--path <path>`):
 //! ```text
-//! px register --name cursor-desktop --path "C:\...\Cursor.exe" --kind desktop
+//! px register --name cursor-d --path "C:\...\Cursor.exe" --kind desktop
 //! ```
 //!
 //! **Interactive detection** (no `--path`):

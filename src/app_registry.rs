@@ -50,60 +50,114 @@ impl AppDefinition {
 /// are separate registered shortcuts.
 pub const KNOWN_APPS: &[AppDefinition] = &[
     AppDefinition {
-        shortcut: "vscode-desktop",
+        shortcut: "vscode-d",
         display_name: "Visual Studio Code",
-        aliases: &["code", "visual studio code", "vscode"],
+        aliases: &["code", "visual studio code", "vscode", "vscode desktop"],
         kind: AppKind::Desktop,
         ai_only_proxy: false,
     },
     AppDefinition {
-        shortcut: "vscode-cli",
+        shortcut: "code",
         display_name: "Visual Studio Code CLI",
-        aliases: &["code"],
+        aliases: &["code", "vscode cli"],
         kind: AppKind::Cli,
         ai_only_proxy: false,
     },
     AppDefinition {
-        shortcut: "cursor-desktop",
+        shortcut: "cursor-d",
         display_name: "Cursor",
-        aliases: &["cursor"],
+        aliases: &["cursor", "cursor desktop", "cursor-desktop"],
         kind: AppKind::Desktop,
         ai_only_proxy: true,
     },
     AppDefinition {
-        shortcut: "cursor-cli",
+        shortcut: "cursor",
         display_name: "Cursor CLI",
-        aliases: &["cursor"],
+        aliases: &["cursor", "cursor cli", "cursor-cli"],
         kind: AppKind::Cli,
         ai_only_proxy: true,
     },
     AppDefinition {
-        shortcut: "codex-desktop",
+        shortcut: "codex-d",
         display_name: "Codex",
-        aliases: &["codex"],
+        aliases: &["codex", "codex desktop", "codex-desktop"],
         kind: AppKind::Desktop,
         ai_only_proxy: true,
     },
     AppDefinition {
-        shortcut: "codex-cli",
+        shortcut: "codex",
         display_name: "Codex CLI",
-        aliases: &["codex"],
+        aliases: &["codex", "codex cli", "codex-cli"],
         kind: AppKind::Cli,
         ai_only_proxy: true,
     },
     AppDefinition {
-        shortcut: "antigravity-desktop",
+        shortcut: "antigravity-d",
         display_name: "Antigravity",
-        aliases: &["antigravity", "antigravity ide"],
+        aliases: &[
+            "antigravity",
+            "antigravity ide",
+            "antigravity desktop",
+            "antigravity-desktop",
+        ],
         kind: AppKind::Desktop,
         ai_only_proxy: true,
     },
     AppDefinition {
-        shortcut: "antigravity-cli",
+        shortcut: "antigravity",
         display_name: "Antigravity CLI",
-        aliases: &["antigravity", "antigravity ide"],
+        aliases: &["antigravity", "antigravity cli", "antigravity-cli"],
         kind: AppKind::Cli,
         ai_only_proxy: true,
+    },
+    AppDefinition {
+        shortcut: "kiro-d",
+        display_name: "Kiro",
+        aliases: &["kiro", "kiro desktop", "kiro-desktop"],
+        kind: AppKind::Desktop,
+        ai_only_proxy: true,
+    },
+    AppDefinition {
+        shortcut: "kiro",
+        display_name: "Kiro CLI",
+        aliases: &["kiro", "kiro cli", "kiro-cli"],
+        kind: AppKind::Cli,
+        ai_only_proxy: true,
+    },
+    AppDefinition {
+        shortcut: "claude-d",
+        display_name: "Claude",
+        aliases: &["claude", "claude desktop", "claude-desktop"],
+        kind: AppKind::Desktop,
+        ai_only_proxy: true,
+    },
+    AppDefinition {
+        shortcut: "claude",
+        display_name: "Claude CLI",
+        aliases: &["claude", "claude cli", "claude-cli", "claude code"],
+        kind: AppKind::Cli,
+        ai_only_proxy: true,
+    },
+    AppDefinition {
+        shortcut: "rustrover-d",
+        display_name: "RustRover",
+        aliases: &["rustrover", "rust rover", "rustrover desktop"],
+        kind: AppKind::Desktop,
+        ai_only_proxy: false,
+    },
+    AppDefinition {
+        shortcut: "rustrover",
+        display_name: "RustRover CLI",
+        aliases: &["rustrover", "rust rover cli"],
+        kind: AppKind::Cli,
+        ai_only_proxy: false,
+    },
+    AppDefinition {
+        shortcut: "vim",
+        display_name: "Vim",
+        aliases: &["vim"],
+        kind: AppKind::Cli,
+        ai_only_proxy: false,
     },
 ];
 
@@ -124,13 +178,8 @@ pub fn find_by_shortcut(shortcut: &str) -> Option<&'static AppDefinition> {
 pub fn identify_process(process_name: &str, exe_path: &str) -> Option<&'static AppDefinition> {
     KNOWN_APPS
         .iter()
-        .filter(|app| app.kind == AppKind::Desktop)
-        .find(|app| app.matches_process(process_name, exe_path))
-        .or_else(|| {
-            KNOWN_APPS
-                .iter()
-                .find(|app| app.matches_process(process_name, exe_path))
-        })
+        .filter(|app| app.matches_process(process_name, exe_path))
+        .max_by_key(|app| process_match_score(app, process_name, exe_path))
 }
 
 pub fn is_ai_tool(shortcut: &str) -> bool {
@@ -138,8 +187,14 @@ pub fn is_ai_tool(shortcut: &str) -> bool {
         .map(|app| app.ai_only_proxy)
         .unwrap_or_else(|| {
             let lower = shortcut.to_lowercase();
-            lower.contains("cursor") || lower.contains("codex") || lower.contains("antigravity")
+            ai_tool_name_fragments()
+                .iter()
+                .any(|fragment| lower.contains(fragment))
         })
+}
+
+fn ai_tool_name_fragments() -> &'static [&'static str] {
+    &["cursor", "codex", "antigravity", "kiro", "claude"]
 }
 
 fn normalize_match_text(raw: &str) -> String {
@@ -174,6 +229,42 @@ fn executable_name(exe_path: &str) -> &str {
         .unwrap_or(exe_path)
 }
 
+fn process_match_score(app: &AppDefinition, process_name: &str, exe_path: &str) -> i32 {
+    let mut score = match app.kind {
+        AppKind::Desktop if looks_like_desktop_process(process_name, exe_path) => 100,
+        AppKind::Cli if looks_like_cli_process(exe_path) => 100,
+        AppKind::Desktop if looks_like_cli_process(exe_path) => -50,
+        AppKind::Cli if looks_like_desktop_process(process_name, exe_path) => -50,
+        _ => 0,
+    };
+
+    if normalize_match_text(executable_name(exe_path)) == normalize_match_text(process_name) {
+        score += 10;
+    }
+
+    score
+}
+
+fn looks_like_desktop_process(process_name: &str, exe_path: &str) -> bool {
+    let name = normalize_match_text(process_name);
+    let path = normalize_match_text(exe_path);
+
+    path.contains(".app/contents/macos")
+        || path.contains("\\programs\\")
+        || path.contains("\\program files\\")
+        || name == "electron"
+}
+
+fn looks_like_cli_process(exe_path: &str) -> bool {
+    let path = normalize_match_text(exe_path);
+
+    path.contains("/bin/")
+        || path.contains("/.local/bin/")
+        || path.contains("\\bin\\")
+        || path.ends_with(".cmd")
+        || path.ends_with(".bat")
+}
+
 fn process_tokens(raw: &str) -> Vec<String> {
     raw.split(|c: char| !c.is_ascii_alphanumeric())
         .filter(|part| !part.is_empty())
@@ -195,6 +286,39 @@ fn home_path(template: &str, relative: &str) -> PathCandidate {
         template: template.to_string(),
         evaluated: dirs::home_dir().unwrap_or_default().join(relative),
     }
+}
+
+#[cfg(target_os = "macos")]
+fn desktop_app_paths(app_name: &str, executable_names: &[&str]) -> Vec<PathCandidate> {
+    let mut candidates = Vec::new();
+
+    for executable in executable_names {
+        candidates.push(p(&format!(
+            "/Applications/{app_name}.app/Contents/MacOS/{executable}"
+        )));
+        candidates.push(home_path(
+            &format!("~/Applications/{app_name}.app/Contents/MacOS/{executable}"),
+            &format!("Applications/{app_name}.app/Contents/MacOS/{executable}"),
+        ));
+    }
+
+    candidates
+}
+
+#[cfg(target_os = "macos")]
+fn cli_paths(command: &str) -> Vec<PathCandidate> {
+    vec![
+        p(&format!("/opt/homebrew/bin/{command}")),
+        p(&format!("/usr/local/bin/{command}")),
+        home_path(
+            &format!("~/.local/bin/{command}"),
+            &format!(".local/bin/{command}"),
+        ),
+        home_path(
+            &format!("~/.{command}/local/{command}"),
+            &format!(".{command}/local/{command}"),
+        ),
+    ]
 }
 
 #[cfg(target_os = "windows")]
@@ -223,49 +347,78 @@ fn windows_paths(shortcut: &str) -> Vec<PathCandidate> {
     };
 
     match shortcut {
-        "vscode-desktop" => vec![
+        "vscode-d" => vec![
             lp(r"Programs\Microsoft VS Code\Code.exe"),
             pp(r"Microsoft VS Code\Code.exe"),
             p86(r"Microsoft VS Code\Code.exe"),
             lp(r"Microsoft\WindowsApps\code.exe"),
         ],
-        "vscode-cli" => vec![
+        "code" => vec![
             lp(r"Programs\Microsoft VS Code\bin\code"),
             pp(r"Microsoft VS Code\bin\code"),
             p86(r"Microsoft VS Code\bin\code"),
         ],
-        "cursor-desktop" => vec![
+        "cursor-d" => vec![
             lp(r"Programs\cursor\Cursor.exe"),
             lp(r"Programs\Cursor\Cursor.exe"),
             pp(r"Cursor\Cursor.exe"),
         ],
-        "cursor-cli" => vec![
+        "cursor" => vec![
             lp(r"Programs\cursor\resources\app\bin\cursor.cmd"),
             lp(r"Programs\Cursor\resources\app\bin\cursor.cmd"),
             lp(r"Programs\cursor\cursor.cmd"),
             pp(r"Cursor\cursor.cmd"),
         ],
-        "codex-desktop" => vec![
+        "codex-d" => vec![
             lp(r"Programs\codex\Codex.exe"),
             lp(r"Programs\Codex\Codex.exe"),
             pp(r"Codex\Codex.exe"),
             lp(r"Microsoft\WindowsApps\codex.exe"),
         ],
-        "codex-cli" => vec![
+        "codex" => vec![
             lp(r"Programs\codex\codex.cmd"),
             pp(r"nodejs\codex.cmd"),
             lp(r"Microsoft\WindowsApps\codex.exe"),
         ],
-        "antigravity-desktop" => vec![
+        "antigravity-d" => vec![
             lp(r"Programs\antigravity ide\Antigravity IDE.exe"),
             lp(r"Programs\Antigravity IDE\Antigravity IDE.exe"),
             pp(r"Antigravity IDE\Antigravity IDE.exe"),
         ],
-        "antigravity-cli" => vec![
+        "antigravity" => vec![
             lp(r"Programs\antigravity ide\bin\antigravity.cmd"),
             lp(r"Programs\Antigravity IDE\bin\antigravity.cmd"),
             pp(r"Antigravity IDE\bin\antigravity.cmd"),
         ],
+        "kiro-d" => vec![
+            lp(r"Programs\Kiro\Kiro.exe"),
+            pp(r"Kiro\Kiro.exe"),
+            lp(r"Microsoft\WindowsApps\kiro.exe"),
+        ],
+        "kiro" => vec![
+            lp(r"Programs\Kiro\bin\kiro.cmd"),
+            pp(r"Kiro\bin\kiro.cmd"),
+            lp(r"Microsoft\WindowsApps\kiro.exe"),
+        ],
+        "claude-d" => vec![
+            lp(r"Programs\Claude\Claude.exe"),
+            pp(r"Claude\Claude.exe"),
+            lp(r"Microsoft\WindowsApps\claude.exe"),
+        ],
+        "claude" => vec![
+            lp(r"Programs\Claude\bin\claude.cmd"),
+            pp(r"nodejs\claude.cmd"),
+            lp(r"Microsoft\WindowsApps\claude.exe"),
+        ],
+        "rustrover-d" => vec![
+            lp(r"Programs\RustRover\bin\rustrover64.exe"),
+            pp(r"JetBrains\RustRover\bin\rustrover64.exe"),
+        ],
+        "rustrover" => vec![
+            lp(r"Programs\RustRover\bin\rustrover.cmd"),
+            pp(r"JetBrains\RustRover\bin\rustrover.cmd"),
+        ],
+        "vim" => vec![pp(r"Vim\vim91\vim.exe"), pp(r"Vim\vim90\vim.exe")],
         _ => vec![],
     }
 }
@@ -279,7 +432,7 @@ fn path_candidates_for(shortcut: &str) -> Vec<PathCandidate> {
     #[cfg(target_os = "macos")]
     {
         match shortcut {
-            "vscode-desktop" => vec![
+            "vscode-d" => vec![
                 p("/Applications/Visual Studio Code.app/Contents/MacOS/Code"),
                 p("/Applications/Visual Studio Code.app/Contents/MacOS/Electron"),
                 home_path(
@@ -291,32 +444,32 @@ fn path_candidates_for(shortcut: &str) -> Vec<PathCandidate> {
                     "Applications/Visual Studio Code.app/Contents/MacOS/Electron",
                 ),
             ],
-            "vscode-cli" => vec![p("/opt/homebrew/bin/code"), p("/usr/local/bin/code")],
-            "cursor-desktop" => vec![
+            "code" => vec![p("/opt/homebrew/bin/code"), p("/usr/local/bin/code")],
+            "cursor-d" => vec![
                 p("/Applications/Cursor.app/Contents/MacOS/Cursor"),
                 home_path(
                     "~/Applications/Cursor.app/Contents/MacOS/Cursor",
                     "Applications/Cursor.app/Contents/MacOS/Cursor",
                 ),
             ],
-            "cursor-cli" => vec![
+            "cursor" => vec![
                 p("/opt/homebrew/bin/cursor"),
                 p("/usr/local/bin/cursor"),
                 home_path("~/.local/bin/cursor", ".local/bin/cursor"),
             ],
-            "codex-desktop" => vec![
+            "codex-d" => vec![
                 p("/Applications/Codex.app/Contents/MacOS/Codex"),
                 home_path(
                     "~/Applications/Codex.app/Contents/MacOS/Codex",
                     "Applications/Codex.app/Contents/MacOS/Codex",
                 ),
             ],
-            "codex-cli" => vec![
+            "codex" => vec![
                 p("/opt/homebrew/bin/codex"),
                 p("/usr/local/bin/codex"),
                 home_path("~/.local/bin/codex", ".local/bin/codex"),
             ],
-            "antigravity-desktop" => vec![
+            "antigravity-d" => vec![
                 p("/Applications/Antigravity.app/Contents/MacOS/Antigravity"),
                 p("/Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE"),
                 p("/Applications/Antigravity IDE.app/Contents/MacOS/Electron"),
@@ -329,10 +482,32 @@ fn path_candidates_for(shortcut: &str) -> Vec<PathCandidate> {
                     "Applications/Antigravity IDE.app/Contents/MacOS/Antigravity IDE",
                 ),
             ],
-            "antigravity-cli" => vec![
+            "antigravity" => vec![
                 p("/opt/homebrew/bin/antigravity"),
                 p("/usr/local/bin/antigravity"),
                 home_path("~/.local/bin/antigravity", ".local/bin/antigravity"),
+            ],
+            "kiro-d" => desktop_app_paths("Kiro", &["Kiro", "kiro", "Electron"]),
+            "kiro" => cli_paths("kiro"),
+            "claude-d" => desktop_app_paths("Claude", &["Claude", "claude", "Electron"]),
+            "claude" => cli_paths("claude"),
+            "rustrover-d" => vec![
+                p("/Applications/RustRover.app/Contents/MacOS/rustrover"),
+                p("/Applications/RustRover.app/Contents/MacOS/RustRover"),
+                home_path(
+                    "~/Applications/RustRover.app/Contents/MacOS/rustrover",
+                    "Applications/RustRover.app/Contents/MacOS/rustrover",
+                ),
+            ],
+            "rustrover" => vec![
+                p("/opt/homebrew/bin/rustrover"),
+                p("/usr/local/bin/rustrover"),
+                home_path("~/.local/bin/rustrover", ".local/bin/rustrover"),
+            ],
+            "vim" => vec![
+                p("/usr/bin/vim"),
+                p("/opt/homebrew/bin/vim"),
+                p("/usr/local/bin/vim"),
             ],
             _ => vec![],
         }
@@ -341,45 +516,75 @@ fn path_candidates_for(shortcut: &str) -> Vec<PathCandidate> {
     #[cfg(target_os = "linux")]
     {
         match shortcut {
-            "vscode-desktop" => vec![
+            "vscode-d" => vec![
                 p("/usr/share/code/code"),
                 p("/opt/visual-studio-code/code"),
                 p("/snap/bin/code"),
             ],
-            "vscode-cli" => vec![
+            "code" => vec![
                 p("/usr/bin/code"),
                 p("/usr/local/bin/code"),
                 p("/snap/bin/code"),
             ],
-            "cursor-desktop" => vec![
+            "cursor-d" => vec![
                 p("/opt/cursor/cursor"),
                 p("/usr/bin/cursor"),
                 p("/usr/local/bin/cursor"),
             ],
-            "cursor-cli" => vec![
+            "cursor" => vec![
                 p("/usr/bin/cursor"),
                 p("/usr/local/bin/cursor"),
                 home_path("~/.local/bin/cursor", ".local/bin/cursor"),
             ],
-            "codex-desktop" => vec![p("/opt/codex/codex")],
-            "codex-cli" => vec![
+            "codex-d" => vec![p("/opt/codex/codex")],
+            "codex" => vec![
                 p("/usr/bin/codex"),
                 p("/usr/local/bin/codex"),
                 home_path("~/.local/bin/codex", ".local/bin/codex"),
             ],
-            "antigravity-desktop" => vec![
+            "antigravity-d" => vec![
                 p("/opt/antigravity/antigravity"),
                 p("/opt/antigravity-ide/antigravity-ide"),
                 p("/usr/local/bin/antigravity"),
                 p("/usr/local/bin/antigravity-ide"),
             ],
-            "antigravity-cli" => vec![
+            "antigravity" => vec![
                 p("/usr/bin/antigravity"),
                 p("/usr/local/bin/antigravity"),
                 p("/usr/bin/antigravity-ide"),
                 p("/usr/local/bin/antigravity-ide"),
                 home_path("~/.local/bin/antigravity", ".local/bin/antigravity"),
             ],
+            "kiro-d" => vec![
+                p("/opt/kiro/kiro"),
+                p("/usr/local/bin/kiro"),
+                p("/usr/bin/kiro"),
+            ],
+            "kiro" => vec![
+                p("/usr/bin/kiro"),
+                p("/usr/local/bin/kiro"),
+                home_path("~/.local/bin/kiro", ".local/bin/kiro"),
+            ],
+            "claude-d" => vec![
+                p("/opt/claude/claude"),
+                p("/usr/local/bin/claude"),
+                p("/usr/bin/claude"),
+            ],
+            "claude" => vec![
+                p("/usr/bin/claude"),
+                p("/usr/local/bin/claude"),
+                home_path("~/.local/bin/claude", ".local/bin/claude"),
+            ],
+            "rustrover-d" => vec![
+                p("/opt/rustrover/bin/rustrover"),
+                p("/usr/local/bin/rustrover"),
+            ],
+            "rustrover" => vec![
+                p("/usr/bin/rustrover"),
+                p("/usr/local/bin/rustrover"),
+                home_path("~/.local/bin/rustrover", ".local/bin/rustrover"),
+            ],
+            "vim" => vec![p("/usr/bin/vim"), p("/usr/local/bin/vim")],
             _ => vec![],
         }
     }
@@ -399,7 +604,7 @@ mod tests {
     fn identifies_cursor_process() {
         let app = identify_process("Cursor", "/Applications/Cursor.app/Contents/MacOS/Cursor")
             .expect("cursor should be known");
-        assert_eq!(app.shortcut, "cursor-desktop");
+        assert_eq!(app.shortcut, "cursor-d");
         assert!(app.ai_only_proxy);
     }
 
@@ -410,15 +615,17 @@ mod tests {
             r"C:\Users\me\AppData\Local\Programs\Antigravity IDE\Antigravity IDE.exe",
         )
         .expect("antigravity should be known");
-        assert_eq!(app.shortcut, "antigravity-desktop");
+        assert_eq!(app.shortcut, "antigravity-d");
     }
 
     #[test]
     fn recognizes_ai_tool_shortcuts() {
-        assert!(is_ai_tool("codex-cli"));
-        assert!(is_ai_tool("cursor-desktop"));
+        assert!(is_ai_tool("codex"));
+        assert!(is_ai_tool("cursor-d"));
+        assert!(is_ai_tool("kiro"));
+        assert!(is_ai_tool("claude-d"));
         assert!(is_ai_tool("my-antigravity-wrapper"));
-        assert!(!is_ai_tool("vscode-desktop"));
+        assert!(!is_ai_tool("vscode-d"));
     }
 
     #[test]
@@ -432,17 +639,71 @@ mod tests {
             identify_process("codex", "/Users/me/.local/bin/codex")
                 .expect("codex should be known")
                 .shortcut,
-            "codex-desktop"
+            "codex"
         );
         assert!(identify_process(
             "node_repl",
             "/Applications/Codex.app/Contents/Resources/cua_node/bin/node_repl"
         )
         .is_none());
-        assert!(
-            identify_process("PasscodeSettingsSubscriber", "/System/PasscodeSettingsSubscriber")
-                .is_none()
-        );
+        assert!(identify_process(
+            "PasscodeSettingsSubscriber",
+            "/System/PasscodeSettingsSubscriber"
+        )
+        .is_none());
         assert!(identify_process("VTDecoderXPCService", "/System/VTDecoderXPCService").is_none());
+    }
+
+    #[test]
+    fn ignores_macos_cursor_ui_service() {
+        assert!(identify_process(
+            "CursorUIViewService",
+            "/System/Library/PrivateFrameworks/TextInputUIMacHelper.framework/Versions/A/XPCServices/CursorUIViewService.xpc/Contents/MacOS/CursorUIViewService",
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn distinguishes_codex_desktop_from_cli() {
+        assert_eq!(
+            identify_process("Codex", "/Applications/Codex.app/Contents/MacOS/Codex")
+                .expect("desktop codex should be known")
+                .shortcut,
+            "codex-d"
+        );
+        assert_eq!(
+            identify_process("codex", "/Users/me/.local/bin/codex")
+                .expect("cli codex should be known")
+                .shortcut,
+            "codex"
+        );
+    }
+
+    #[test]
+    fn identifies_kiro_and_claude_variants() {
+        assert_eq!(
+            identify_process("Kiro", "/Applications/Kiro.app/Contents/MacOS/Kiro")
+                .expect("desktop kiro should be known")
+                .shortcut,
+            "kiro-d"
+        );
+        assert_eq!(
+            identify_process("kiro", "/Users/me/.local/bin/kiro")
+                .expect("cli kiro should be known")
+                .shortcut,
+            "kiro"
+        );
+        assert_eq!(
+            identify_process("Claude", "/Applications/Claude.app/Contents/MacOS/Claude")
+                .expect("desktop claude should be known")
+                .shortcut,
+            "claude-d"
+        );
+        assert_eq!(
+            identify_process("claude", "/Users/me/.claude/local/claude")
+                .expect("cli claude should be known")
+                .shortcut,
+            "claude"
+        );
     }
 }

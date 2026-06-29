@@ -8,11 +8,11 @@
 //! port      = 8080
 //! cert_path = ""           # leave empty to skip NODE_EXTRA_CA_CERTS injection
 //!
-//! [apps.cursor-desktop]
+//! [apps.cursor-d]
 //! path = "/Applications/Cursor.app/Contents/MacOS/Cursor"
 //! kind = "desktop"         # detach immediately — don't hold the terminal hostage
 //!
-//! [apps.codex-cli]
+//! [apps.codex]
 //! path = "/usr/local/bin/codex"
 //! kind = "cli"             # block, inherit IO, and propagate exit code
 //! ```

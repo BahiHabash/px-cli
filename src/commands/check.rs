@@ -8,9 +8,9 @@
 //! ```text
 //! Checking 3 registered app(s) …
 //!
-//!   ✔  cursor-desktop   desktop   /Applications/Cursor.app/Contents/MacOS/Cursor
-//!   ✔  codex-cli        cli       /usr/local/bin/codex
-//!   ✘  vscode-desktop   desktop   /Applications/Visual Studio Code.app  [not found]
+//!   ✔  cursor-d   desktop   /Applications/Cursor.app/Contents/MacOS/Cursor
+//!   ✔  codex      cli       /usr/local/bin/codex
+//!   ✘  vscode-d   desktop   /Applications/Visual Studio Code.app  [not found]
 //!
 //! Summary: 2 healthy, 1 broken
 //! ```
