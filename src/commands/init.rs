@@ -6,11 +6,11 @@
 //! 4. Runs the auto-discovery engine and appends any found applications
 //!    to `config.toml`, skipping shortcuts that already exist.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use colored::Colorize;
 
-use crate::config;
 use crate::commands::discover;
+use crate::config;
 
 /// Scaffold config files and auto-discover developer tools on this machine.
 pub fn run() -> Result<()> {
@@ -62,14 +62,34 @@ pub fn run() -> Result<()> {
         );
     }
 
+    let mut cfg = match config::load() {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!(
+                "\n{} Cannot continue auto-discovery because config.toml is invalid.",
+                "✘".red().bold()
+            );
+            eprintln!("  {}", format!("{err:#}").red());
+            eprintln!(
+                "  {} Fix the file at '{}' and run `px init` again.",
+                "→".yellow(),
+                config_path.display()
+            );
+            eprintln!("  {} Existing config was left unchanged.", "ℹ".cyan());
+            bail!("invalid config.toml");
+        }
+    };
+
     // --- Auto-discovery -----------------------------------------------------
     println!("\n{} Scanning for developer tools …", "⟳".yellow().bold());
 
-    let mut cfg = config::load()?;
     let found = discover::scan();
 
     if found.is_empty() {
-        println!("  {} No supported tools detected on this machine.", "ℹ".cyan());
+        println!(
+            "  {} No supported tools detected on this machine.",
+            "ℹ".cyan()
+        );
     } else {
         let mut added = 0usize;
         let mut skipped = 0usize;
