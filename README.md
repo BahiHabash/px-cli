@@ -205,15 +205,15 @@ no_proxy_extra = ["registry.company.internal", "git.company.internal"]
 
 ## How It Works
 
-### Shell-Wrapper Launch
+### Launch Model
 
-Instead of spawning the app directly, `px` always launches via the platform shell:
+On Unix, `px` launches through the platform shell. On Windows, `px` launches the app directly with environment variables injected to avoid fragile `cmd.exe` quoting for paths with spaces.
 
 | Platform | Shell     | Command                                          |
 |----------|-----------|--------------------------------------------------|
 | Unix CLI | `/bin/sh` | `sh -c 'HTTP_PROXY="..." exec /path/to/tool'`   |
 | Unix desktop | `/bin/sh` | `sh -c 'HTTP_PROXY="..." nohup /path/to/app >/dev/null 2>&1 &'` |
-| Windows  | `cmd`     | `cmd /c "set HTTP_PROXY=...&& path\to\app.exe"` |
+| Windows  | native process | `Command::env(...).spawn()`                |
 
 On Unix, CLI launches use `exec` to replace the shell process. Desktop launches use `nohup` in the background, so closing the terminal does not close the app.
 

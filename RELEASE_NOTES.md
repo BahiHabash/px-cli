@@ -1,4 +1,4 @@
-# px v2.0.1
+# px v2.0.2
 
 `px` is a small proxy launcher for AI-heavy developer workflows. It launches registered tools with proxy environment variables injected, and AI-only mode keeps normal development traffic such as package managers, Git forges, and local services on a direct connection.
 
@@ -64,6 +64,7 @@ Typical AI shortcuts discovered by `px init` include `cursor-d`, `cursor`, `code
 
 - Packages release assets as archives with the executable already named `px` or `px.exe`.
 - Updates installer scripts to download the packaged release archives.
+- Fixes Windows app launching by using native process spawning instead of `cmd.exe` command strings.
 - Adds `px credentials set` and `px credentials show` for local `.env` management.
 - Adds shorter built-in shortcuts such as `cursor-d`, `codex`, `kiro`, `claude`, and `antigravity`.
 - Expands auto-discovery for AI-focused developer tools.

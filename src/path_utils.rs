@@ -67,19 +67,61 @@ pub fn resolve_exec_path(raw: &str) -> PathBuf {
 
     #[cfg(target_os = "windows")]
     {
-        if original.exists() {
+        let ext = original
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.to_ascii_lowercase());
+
+        if original.exists() && matches!(ext.as_deref(), Some("exe" | "cmd" | "bat" | "com")) {
             return original;
         }
+
         for ext in &["exe", "cmd"] {
             let candidate = original.with_extension(ext);
             if candidate.exists() {
                 return candidate;
             }
         }
+
+        if original.exists() {
+            return original;
+        }
+
         // Return original and let the OS produce a meaningful error.
         return original;
     }
 
     #[cfg(not(target_os = "windows"))]
     original
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn prefers_cmd_shim_over_extensionless_file_on_windows() {
+        let dir = std::env::temp_dir().join(format!("px-path-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let extensionless = dir.join("code");
+        let cmd = dir.join("code.cmd");
+        std::fs::write(&extensionless, "").unwrap();
+        std::fs::write(&cmd, "").unwrap();
+
+        assert_eq!(resolve_exec_path(extensionless.to_str().unwrap()), cmd);
+
+        std::fs::remove_file(extensionless).ok();
+        std::fs::remove_file(cmd).ok();
+        std::fs::remove_dir(dir).ok();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn resolves_original_path_on_unix() {
+        assert_eq!(
+            resolve_exec_path("/tmp/px-test-tool"),
+            PathBuf::from("/tmp/px-test-tool")
+        );
+    }
 }

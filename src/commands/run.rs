@@ -6,15 +6,17 @@
 //!
 //! ## Shell-wrapper execution model
 //!
-//! Every app is launched through a single terminal layer:
+//! Unix apps are launched through a shell wrapper; Windows apps are launched
+//! directly with the same environment variables injected by `Command::env`.
 //!
 //! | Platform | Shell    | Mechanism                    |
 //! |----------|----------|------------------------------|
 //! | Unix     | `/bin/sh`| `VAR="v" exec <app> <args>`  |
-//! | Windows  | `cmd`    | `set VAR=v&& <app> <args>`   |
+//! | Windows  | native   | `Command::env(...).spawn()`  |
 //!
 //! On Unix, `exec` replaces the shell process so no extra PID is left behind.
-//! On Windows, `cmd /c` exits as soon as the child returns.
+//! On Windows, direct spawning avoids fragile `cmd.exe` quoting for paths with
+//! spaces and Windows Store app paths.
 //!
 //! ## Execution class dispatch
 //!
@@ -42,7 +44,9 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 
 use crate::config::AppKind;
-use crate::{config, credentials, no_proxy, path_utils, shell};
+#[cfg(not(target_os = "windows"))]
+use crate::shell;
+use crate::{config, credentials, no_proxy, path_utils};
 
 // ---------------------------------------------------------------------------
 // Proxy URL resolution
@@ -114,12 +118,12 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         env_vars.push(("NODE_EXTRA_CA_CERTS", cert.to_string()));
     }
 
-    // Convert to &str slices for the shell builder.
-    let env_refs: Vec<(&str, &str)> = env_vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
-    // 6. Build the shell invocation (sh -c / cmd /c).
-    let detach = entry.kind == AppKind::Desktop;
-    let invocation = shell::build(&exec_path, &entry.args, &env_refs, detach);
+    #[cfg(not(target_os = "windows"))]
+    let invocation = {
+        let env_refs: Vec<(&str, &str)> = env_vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let detach = entry.kind == AppKind::Desktop;
+        shell::build(&exec_path, &entry.args, &env_refs, detach)
+    };
 
     // 7. Status line before launch.
     let mode_label = match entry.kind {
@@ -152,10 +156,28 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
         args_label,
     );
 
-    // 8. Build the underlying Command from the shell invocation.
+    // 8. Build the underlying Command.
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut cmd = process::Command::new(&exec_path);
+        cmd.args(&entry.args);
+        for (key, val) in &env_vars {
+            cmd.env(key, val);
+        }
+        cmd
+    };
+
+    #[cfg(not(target_os = "windows"))]
     let mut cmd = process::Command::new(&invocation.shell);
+
+    #[cfg(not(target_os = "windows"))]
     cmd.args(&invocation.shell_args)
         .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    #[cfg(target_os = "windows")]
+    cmd.stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
 

@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $Repo = if ($env:PX_REPO) { $env:PX_REPO } else { "BahiHabash/px-cli" }
-$Tag = if ($env:PX_VERSION) { $env:PX_VERSION } else { "v2.0.1" }
+$Tag = if ($env:PX_VERSION) { $env:PX_VERSION } else { "v2.0.2" }
 $InstallDir = if ($env:PX_INSTALL_DIR) { $env:PX_INSTALL_DIR } else { Join-Path $HOME ".local\bin" }
 $Asset = "px-windows-x64.zip"
 $Url = "https://github.com/$Repo/releases/download/$Tag/$Asset"

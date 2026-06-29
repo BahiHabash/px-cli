@@ -2,7 +2,7 @@
 set -eu
 
 REPO="${PX_REPO:-BahiHabash/px-cli}"
-TAG="${PX_VERSION:-v2.0.1}"
+TAG="${PX_VERSION:-v2.0.2}"
 INSTALL_DIR="${PX_INSTALL_DIR:-$HOME/.local/bin}"
 
 os="$(uname -s)"
