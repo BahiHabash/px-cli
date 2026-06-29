@@ -56,8 +56,11 @@ pub enum Commands {
         search: Option<String>,
 
         /// Execution class: `cli` blocks the terminal; `desktop` detaches immediately.
-        #[arg(short, long, value_enum, default_value_t = AppKind::Cli)]
-        kind: AppKind,
+        ///
+        /// If omitted during process-based registration, px infers it from the
+        /// detected app and falls back to `desktop` for unknown running apps.
+        #[arg(short, long, value_enum)]
+        kind: Option<AppKind>,
 
         /// Route only AI/LLM API traffic through the proxy.
         ///
