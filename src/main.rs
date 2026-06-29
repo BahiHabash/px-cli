@@ -19,7 +19,7 @@ mod shell;
 use anyhow::Result;
 use clap::Parser;
 
-use cli::Commands;
+use cli::{Commands, CredentialCommands};
 
 fn main() -> Result<()> {
     let cli = cli::Cli::parse();
@@ -40,6 +40,15 @@ fn main() -> Result<()> {
         Commands::Check => commands::check::run(),
         Commands::Ps { search, known } => commands::ps::run(search.as_deref(), known),
         Commands::Proxy { show_secret } => commands::proxy::run(show_secret),
+        Commands::Credentials { command } => match command {
+            CredentialCommands::Set {
+                user,
+                pass,
+                host,
+                port,
+            } => commands::credentials::set(user, pass, host, port),
+            CredentialCommands::Show { show_secret } => commands::credentials::show(show_secret),
+        },
         Commands::Alias { old_name, new_name } => commands::alias::run(&old_name, &new_name),
         Commands::Edit => commands::edit::run(),
     }

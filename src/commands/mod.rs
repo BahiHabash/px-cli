@@ -2,10 +2,11 @@
 
 pub mod alias;
 pub mod check;
+pub mod credentials;
 pub mod discover;
 pub mod edit;
 pub mod init;
-pub mod ps;
 pub mod proxy;
+pub mod ps;
 pub mod register;
 pub mod run;

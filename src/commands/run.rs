@@ -32,7 +32,7 @@
 //!
 //! ## Proxy override
 //!
-//! `--proxy-override http://user:pass@host:port` completely bypasses `.env`
+//! `--proxy-override socks5://user:pass@host:port` completely bypasses `.env`
 //! credential loading and uses the provided URL as-is for all three proxy
 //! environment variables.
 
@@ -41,8 +41,8 @@ use std::process::{self, Stdio};
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-use crate::{config, credentials, no_proxy, path_utils, shell};
 use crate::config::AppKind;
+use crate::{config, credentials, no_proxy, path_utils, shell};
 
 // ---------------------------------------------------------------------------
 // Proxy URL resolution
@@ -54,10 +54,7 @@ use crate::config::AppKind;
 ///   are **not** loaded — this is the anti-credential-leak guardrail).
 /// - Otherwise, credentials are loaded from the `.env` file and combined with
 ///   the host/port from `config.toml`.
-fn resolve_proxy_url(
-    proxy_override: Option<&str>,
-    cfg: &config::Config,
-) -> Result<String> {
+fn resolve_proxy_url(proxy_override: Option<&str>, cfg: &config::Config) -> Result<String> {
     if let Some(url) = proxy_override {
         return Ok(url.to_string());
     }
@@ -102,15 +99,15 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
     //    LLM API hosts bypasses the proxy.  The shell-wrapper then exports all
     //    of these before exec-ing the target app.
     let mut env_vars: Vec<(&str, String)> = vec![
-        ("HTTP_PROXY",  proxy_url.clone()),
+        ("HTTP_PROXY", proxy_url.clone()),
         ("HTTPS_PROXY", proxy_url.clone()),
-        ("ALL_PROXY",   proxy_url.clone()),
+        ("ALL_PROXY", proxy_url.clone()),
     ];
 
     if entry.ai_only_proxy {
         let np = no_proxy::build_no_proxy(&cfg.proxy.no_proxy_extra);
         env_vars.push(("NO_PROXY", np.clone()));
-        env_vars.push(("no_proxy", np));          // lowercase alias for curl/wget
+        env_vars.push(("no_proxy", np)); // lowercase alias for curl/wget
     }
 
     if let Some(cert) = cert_path {
@@ -118,10 +115,7 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
     }
 
     // Convert to &str slices for the shell builder.
-    let env_refs: Vec<(&str, &str)> = env_vars
-        .iter()
-        .map(|(k, v)| (*k, v.as_str()))
-        .collect();
+    let env_refs: Vec<(&str, &str)> = env_vars.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
     // 6. Build the shell invocation (sh -c / cmd /c).
     let detach = entry.kind == AppKind::Desktop;
@@ -130,7 +124,7 @@ pub fn run(shortcut: &str, proxy_override: Option<String>) -> Result<()> {
     // 7. Status line before launch.
     let mode_label = match entry.kind {
         AppKind::Desktop => "detached".dimmed(),
-        AppKind::Cli     => "blocking".dimmed(),
+        AppKind::Cli => "blocking".dimmed(),
     };
     let proxy_mode_label = if entry.ai_only_proxy {
         " [ai-only]".cyan().bold().to_string()

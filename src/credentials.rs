@@ -37,6 +37,8 @@ use anyhow::{bail, Context, Result};
 
 use crate::config;
 
+const PROXY_SCHEME: &str = "socks5";
+
 pub struct ProxyCredentials {
     pub user: String,
     pub pass: String,
@@ -101,7 +103,12 @@ pub fn get_proxy_credentials() -> Result<ProxyCredentials> {
     let host = std::env::var("PX_HOST").ok();
     let port = std::env::var("PX_PORT").ok().and_then(|p| p.parse().ok());
 
-    Ok(ProxyCredentials { user, pass, host, port })
+    Ok(ProxyCredentials {
+        user,
+        pass,
+        host,
+        port,
+    })
 }
 
 /// Builds the same proxy URL used by `px run`, plus redacted diagnostics.
@@ -118,8 +125,14 @@ pub fn resolve_proxy_url(cfg: &config::Config) -> Result<ResolvedProxyUrl> {
     };
 
     Ok(ResolvedProxyUrl {
-        url: format!("http://{}:{}@{}:{}", creds.user, creds.pass, host, port),
-        masked_url: format!("http://{}:<redacted>@{}:{}", creds.user, host, port),
+        url: format!(
+            "{}://{}:{}@{}:{}",
+            PROXY_SCHEME, creds.user, creds.pass, host, port
+        ),
+        masked_url: format!(
+            "{}://{}:<redacted>@{}:{}",
+            PROXY_SCHEME, creds.user, host, port
+        ),
         host_source,
         port_source,
     })
