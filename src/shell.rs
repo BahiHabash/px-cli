@@ -22,7 +22,7 @@
 //!
 //! | Platform | Shell    | Arg   | Env syntax            | Exec                  |
 //! |----------|----------|-------|-----------------------|-----------------------|
-//! | Unix     | `/bin/sh`| `-c`  | `VAR="val" VAR2="v2"` | `exec <path> <args>`  |
+//! | Unix     | `/bin/sh`| `-c`  | `VAR="val" VAR2="v2"` | `exec` or `nohup ... &` |
 //! | Windows  | `cmd`    | `/c`  | `set VAR=val&&set V2` | `start "" /b <path>`  |
 //!
 //! On Windows, desktop (detached) apps use `start "" "<path>"` so cmd.exe
@@ -73,11 +73,10 @@ pub fn build(
     exec_path: &Path,
     exec_args: &[String],
     env_vars: &[(&str, &str)],
-    #[allow(unused_variables)]
     detach: bool,
 ) -> ShellInvocation {
     #[cfg(not(target_os = "windows"))]
-    return build_unix(exec_path, exec_args, env_vars);
+    return build_unix(exec_path, exec_args, env_vars, detach);
 
     #[cfg(target_os = "windows")]
     return build_windows(exec_path, exec_args, env_vars, detach);
@@ -92,8 +91,11 @@ fn build_unix(
     exec_path: &Path,
     exec_args: &[String],
     env_vars: &[(&str, &str)],
+    detach: bool,
 ) -> ShellInvocation {
-    // Build: VAR1="val1" VAR2="val2" exec /path/to/app arg1 arg2
+    // Build:
+    //   CLI:     VAR1="val1" VAR2="val2" exec /path/to/app arg1 arg2
+    //   Desktop: VAR1="val1" VAR2="val2" nohup /path/to/app arg1 arg2 >/dev/null 2>&1 &
     //
     // We use inline assignment rather than `export` so it works on both bash
     // and dash (the POSIX sh on Ubuntu/Debian).  Values are double-quoted and
@@ -105,13 +107,22 @@ fn build_unix(
         parts.push(format!(r#"{}="{}""#, key, escaped));
     }
 
-    // `exec` replaces the shell process — no leftover sh in the process tree.
     let path_str = exec_path.to_string_lossy();
     let escaped_path = escape_for_sh(&path_str);
-    parts.push(format!(r#"exec "{}""#, escaped_path));
+    if detach {
+        // `nohup ... &` lets desktop apps survive terminal/session shutdown.
+        parts.push(format!(r#"nohup "{}""#, escaped_path));
+    } else {
+        // `exec` replaces the shell process for transparent CLI behavior.
+        parts.push(format!(r#"exec "{}""#, escaped_path));
+    }
 
     for arg in exec_args {
         parts.push(format!(r#""{}""#, escape_for_sh(arg)));
+    }
+
+    if detach {
+        parts.push(">/dev/null 2>&1 &".to_string());
     }
 
     ShellInvocation {
@@ -125,9 +136,9 @@ fn build_unix(
 #[cfg(not(target_os = "windows"))]
 fn escape_for_sh(s: &str) -> String {
     s.replace('\\', r"\\")
-     .replace('"', r#"\""#)
-     .replace('`', r"\`")
-     .replace('$', r"\$")
+        .replace('"', r#"\""#)
+        .replace('`', r"\`")
+        .replace('$', r"\$")
 }
 
 // ---------------------------------------------------------------------------
@@ -182,10 +193,10 @@ fn build_windows(
 #[cfg(target_os = "windows")]
 fn escape_for_cmd(s: &str) -> String {
     s.replace('^', "^^")
-     .replace('&', "^&")
-     .replace('|', "^|")
-     .replace('<', "^<")
-     .replace('>', "^>")
+        .replace('&', "^&")
+        .replace('|', "^|")
+        .replace('<', "^<")
+        .replace('>', "^>")
 }
 
 // ---------------------------------------------------------------------------
@@ -212,8 +223,22 @@ mod tests {
         let path = PathBuf::from("/usr/bin/cursor");
         let inv = build(&path, &[], &[("HTTP_PROXY", "http://p:1234")], false);
         let script = &inv.shell_args[1];
-        assert!(script.contains("exec"), "script must contain 'exec': {}", script);
+        assert!(
+            script.contains("exec"),
+            "script must contain 'exec': {}",
+            script
+        );
         assert!(script.contains("/usr/bin/cursor"));
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn unix_desktop_uses_nohup_background() {
+        let path = PathBuf::from("/Applications/Codex.app/Contents/MacOS/Codex");
+        let inv = build(&path, &[], &[("HTTP_PROXY", "http://p:1234")], true);
+        let script = &inv.shell_args[1];
+        assert!(script.contains("nohup"));
+        assert!(script.ends_with(">/dev/null 2>&1 &"));
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -223,7 +248,10 @@ mod tests {
         let inv = build(
             &path,
             &[],
-            &[("HTTP_PROXY", "http://u:p@host:8080"), ("NO_PROXY", "localhost")],
+            &[
+                ("HTTP_PROXY", "http://u:p@host:8080"),
+                ("NO_PROXY", "localhost"),
+            ],
             false,
         );
         let script = &inv.shell_args[1];
