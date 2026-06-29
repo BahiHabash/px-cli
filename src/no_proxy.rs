@@ -109,8 +109,8 @@ static BASELINE: &[&str] = &[
     "main.vscode-cdn.net",
     "vscode-unpkg.net",
     "gallerycdn.vsassets.io",
-    "az764295.vo.msecnd.net",          // VS Code update CDN
-    "download.cursor.sh",              // Cursor self-update
+    "az764295.vo.msecnd.net", // VS Code update CDN
+    "download.cursor.sh",     // Cursor self-update
     // ── OS / system services ──────────────────────────────────────────────
     "ocsp.apple.com",
     "swscan.apple.com",
@@ -176,7 +176,10 @@ mod tests {
 
     #[test]
     fn extra_hosts_appended() {
-        let extra = vec!["git.acme.internal".to_string(), "registry.acme.internal".to_string()];
+        let extra = vec![
+            "git.acme.internal".to_string(),
+            "registry.acme.internal".to_string(),
+        ];
         let result = build_no_proxy(&extra);
         assert!(result.contains("git.acme.internal"));
         assert!(result.contains("registry.acme.internal"));
