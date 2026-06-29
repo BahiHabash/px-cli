@@ -14,16 +14,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: px-linux
+            package_name: px-linux-x64.tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: px-mac-silicon
+            package_name: px-macos-arm64.tar.gz
           - os: macos-13 # older macos for Intel
             target: x86_64-apple-darwin
-            artifact_name: px-mac-intel
+            package_name: px-macos-x64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: px-windows.exe
+            package_name: px-windows-x64.zip
 
     steps:
       - name: Checkout code
@@ -37,19 +37,29 @@ jobs:
       - name: Build Release
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Prepare Binary (Unix)
+      - name: Prepare Package (Unix)
         if: matrix.os != 'windows-latest'
-        run: mv target/${{ matrix.target }}/release/px ${{ matrix.artifact_name }}
+        run: |
+          mkdir -p dist/package
+          cp target/${{ matrix.target }}/release/px dist/package/px
+          chmod +x dist/package/px
+          cp README.md RELEASE_NOTES.md dist/package/
+          tar -czf dist/${{ matrix.package_name }} -C dist/package .
 
-      - name: Prepare Binary (Windows)
+      - name: Prepare Package (Windows)
         if: matrix.os == 'windows-latest'
-        run: move target\${{ matrix.target }}\release\px.exe ${{ matrix.artifact_name }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\package | Out-Null
+          Copy-Item target\${{ matrix.target }}\release\px.exe dist\package\px.exe
+          Copy-Item README.md, RELEASE_NOTES.md dist\package\
+          Compress-Archive -Path dist\package\* -DestinationPath dist\${{ matrix.package_name }} -Force
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}
+          name: ${{ matrix.package_name }}
+          path: dist/${{ matrix.package_name }}
 
   release:
     name: Create GitHub Release

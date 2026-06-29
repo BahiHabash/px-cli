@@ -15,7 +15,32 @@
 
 ## Setup & Installation
 
-### Recommended Installer
+### Recommended: Download the App
+
+Download the archive for your platform from the GitHub release:
+
+- Windows x64: `px-windows-x64.zip`
+- macOS Apple Silicon: `px-macos-arm64.tar.gz`
+- macOS Intel: `px-macos-x64.tar.gz`
+- Linux x64: `px-linux-x64.tar.gz`
+
+Extract it. The executable inside is already named `px` or `px.exe`.
+
+Run it from that folder:
+
+```bash
+./px --help
+```
+
+Or move it into a folder that is already in your `PATH` so the command is just:
+
+```bash
+px --help
+```
+
+### Optional Installer
+
+If direct script downloads are allowed on your machine, you can also install into your user-local PATH.
 
 macOS/Linux:
 
@@ -34,10 +59,10 @@ The installers download the right release asset, install it as `px`, and use `~/
 ### Manual Install
 
 1. **Install a release binary**: Download the binary for your platform from the GitHub release and place it somewhere in your `PATH`.
-   - Linux: rename `px-linux` to `px`
-   - macOS Apple Silicon: rename `px-mac-silicon` to `px`
-   - macOS Intel: rename `px-mac-intel` to `px`
-   - Windows: use `px-windows.exe`, or rename it to `px.exe`
+   - Linux: extract `px-linux-x64.tar.gz`
+   - macOS Apple Silicon: extract `px-macos-arm64.tar.gz`
+   - macOS Intel: extract `px-macos-x64.tar.gz`
+   - Windows: extract `px-windows-x64.zip`
 2. **Or build locally**: Run `cargo build --release` and place the executable (`target/release/px` or `target/release/px.exe`) in your system's PATH.
 3. **Initialize**: Run `px init`.
    - Creates the platform configuration directory (e.g., `~/.config/proxy-launcher/` or `%APPDATA%\proxy-launcher\`).

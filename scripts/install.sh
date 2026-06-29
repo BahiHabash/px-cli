@@ -2,7 +2,7 @@
 set -eu
 
 REPO="${PX_REPO:-BahiHabash/px-cli}"
-TAG="${PX_VERSION:-v2}"
+TAG="${PX_VERSION:-v2.0.1}"
 INSTALL_DIR="${PX_INSTALL_DIR:-$HOME/.local/bin}"
 
 os="$(uname -s)"
@@ -11,14 +11,14 @@ arch="$(uname -m)"
 case "$os" in
   Darwin)
     case "$arch" in
-      arm64|aarch64) asset="px-mac-silicon" ;;
-      x86_64|amd64) asset="px-mac-intel" ;;
+      arm64|aarch64) asset="px-macos-arm64.tar.gz" ;;
+      x86_64|amd64) asset="px-macos-x64.tar.gz" ;;
       *) echo "Unsupported macOS architecture: $arch" >&2; exit 1 ;;
     esac
     ;;
   Linux)
     case "$arch" in
-      x86_64|amd64) asset="px-linux" ;;
+      x86_64|amd64) asset="px-linux-x64.tar.gz" ;;
       *) echo "Unsupported Linux architecture: $arch" >&2; exit 1 ;;
     esac
     ;;
@@ -29,15 +29,18 @@ case "$os" in
 esac
 
 url="https://github.com/$REPO/releases/download/$TAG/$asset"
-tmp="${TMPDIR:-/tmp}/px-install-$$"
+tmp_dir="${TMPDIR:-/tmp}/px-install-$$"
+archive="$tmp_dir/$asset"
 
 mkdir -p "$INSTALL_DIR"
-trap 'rm -f "$tmp"' EXIT INT TERM
+mkdir -p "$tmp_dir"
+trap 'rm -rf "$tmp_dir"' EXIT INT TERM
 
 echo "Downloading $url"
-curl -fsSL "$url" -o "$tmp"
-chmod +x "$tmp"
-mv "$tmp" "$INSTALL_DIR/px"
+curl -fsSL "$url" -o "$archive"
+tar -xzf "$archive" -C "$tmp_dir"
+chmod +x "$tmp_dir/px"
+mv "$tmp_dir/px" "$INSTALL_DIR/px"
 
 echo "Installed px to $INSTALL_DIR/px"
 if command -v px >/dev/null 2>&1; then

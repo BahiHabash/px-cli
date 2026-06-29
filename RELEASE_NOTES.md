@@ -1,10 +1,33 @@
-# px v2
+# px v2.0.1
 
 `px` is a small proxy launcher for AI-heavy developer workflows. It launches registered tools with proxy environment variables injected, and AI-only mode keeps normal development traffic such as package managers, Git forges, and local services on a direct connection.
 
 ## How to install
 
-Recommended installer:
+Recommended install:
+
+Download the archive for your platform from this release:
+
+- Windows x64: `px-windows-x64.zip`
+- macOS Apple Silicon: `px-macos-arm64.tar.gz`
+- macOS Intel: `px-macos-x64.tar.gz`
+- Linux x64: `px-linux-x64.tar.gz`
+
+Extract it. The executable inside is already named `px` or `px.exe`.
+
+Run it from that folder:
+
+```bash
+./px --help
+```
+
+Or move it into a folder in your `PATH` and run:
+
+```bash
+px --help
+```
+
+Optional installer:
 
 macOS/Linux:
 
@@ -17,17 +40,6 @@ Windows PowerShell:
 ```powershell
 iwr https://raw.githubusercontent.com/BahiHabash/px-cli/main/scripts/install.ps1 -UseB | iex
 ```
-
-Manual install:
-
-Download the binary for your platform from this release:
-
-- Linux: `px-linux`
-- macOS Apple Silicon: `px-mac-silicon`
-- macOS Intel: `px-mac-intel`
-- Windows: `px-windows.exe`
-
-Rename the downloaded Unix/macOS binary to `px`, mark it executable if needed, and place it somewhere in your `PATH`.
 
 ## How to run
 
@@ -50,6 +62,8 @@ Typical AI shortcuts discovered by `px init` include `cursor-d`, `cursor`, `code
 
 ## Changes
 
+- Packages release assets as archives with the executable already named `px` or `px.exe`.
+- Updates installer scripts to download the packaged release archives.
 - Adds `px credentials set` and `px credentials show` for local `.env` management.
 - Adds shorter built-in shortcuts such as `cursor-d`, `codex`, `kiro`, `claude`, and `antigravity`.
 - Expands auto-discovery for AI-focused developer tools.
