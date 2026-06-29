@@ -5,5 +5,6 @@ pub mod check;
 pub mod discover;
 pub mod edit;
 pub mod init;
+pub mod ps;
 pub mod register;
 pub mod run;

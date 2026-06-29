@@ -98,6 +98,22 @@ pub enum Commands {
     /// Exits with code 1 if any paths are broken — safe to use in CI scripts.
     Check,
 
+    /// Inspect running processes that px can register.
+    ///
+    /// Examples:
+    ///   px ps
+    ///   px ps --search cursor
+    ///   px ps --known
+    Ps {
+        /// Filter running processes by name, detected app, or executable path.
+        #[arg(short, long)]
+        search: Option<String>,
+
+        /// Show only processes recognized as known developer tools.
+        #[arg(long, default_value_t = false)]
+        known: bool,
+    },
+
     /// Rename an existing registered shortcut.
     ///
     /// Examples:

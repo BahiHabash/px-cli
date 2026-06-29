@@ -38,6 +38,7 @@ fn main() -> Result<()> {
             proxy_override,
         } => commands::run::run(&shortcut, proxy_override),
         Commands::Check => commands::check::run(),
+        Commands::Ps { search, known } => commands::ps::run(search.as_deref(), known),
         Commands::Alias { old_name, new_name } => commands::alias::run(&old_name, &new_name),
         Commands::Edit => commands::edit::run(),
     }

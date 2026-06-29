@@ -171,6 +171,7 @@ pub fn is_locked_store_path(path_lower: &str) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
 pub fn is_locked_store_path(_path_lower: &str) -> bool {
     false
 }
