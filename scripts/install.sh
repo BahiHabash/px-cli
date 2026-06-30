@@ -12,7 +12,7 @@ case "$os" in
   Darwin)
     case "$arch" in
       arm64|aarch64) asset="px-macos-arm64.tar.gz" ;;
-      x86_64|amd64) asset="px-macos-x64.tar.gz" ;;
+      x86_64|amd64) echo "Intel macOS is not supported by this release. Use an Apple Silicon Mac." >&2; exit 1 ;;
       *) echo "Unsupported macOS architecture: $arch" >&2; exit 1 ;;
     esac
     ;;

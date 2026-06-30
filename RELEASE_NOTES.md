@@ -10,7 +10,6 @@ Download the archive for your platform from this release:
 
 - Windows x64: `px-windows-x64.zip`
 - macOS Apple Silicon: `px-macos-arm64.tar.gz`
-- macOS Intel: `px-macos-x64.tar.gz`
 - Linux x64: `px-linux-x64.tar.gz`
 
 Extract it. The executable inside is already named `px` or `px.exe`.

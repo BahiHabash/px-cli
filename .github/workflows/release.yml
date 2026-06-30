@@ -27,9 +27,6 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             package_name: px-macos-arm64.tar.gz
-          - os: macos-13 # older macos for Intel
-            target: x86_64-apple-darwin
-            package_name: px-macos-x64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             package_name: px-windows-x64.zip
@@ -90,7 +87,6 @@ jobs:
           ls -lah artifacts
           test -f artifacts/px-linux-x64.tar.gz
           test -f artifacts/px-macos-arm64.tar.gz
-          test -f artifacts/px-macos-x64.tar.gz
           test -f artifacts/px-windows-x64.zip
 
       - name: Create Release
