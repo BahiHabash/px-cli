@@ -69,6 +69,7 @@ jobs:
         with:
           name: ${{ matrix.package_name }}
           path: dist/${{ matrix.package_name }}
+          if-no-files-found: error
 
   release:
     name: Create GitHub Release
@@ -84,11 +85,21 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      - name: Verify release assets
+        run: |
+          ls -lah artifacts
+          test -f artifacts/px-linux-x64.tar.gz
+          test -f artifacts/px-macos-arm64.tar.gz
+          test -f artifacts/px-macos-x64.tar.gz
+          test -f artifacts/px-windows-x64.zip
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: artifacts/*
           body_path: RELEASE_NOTES.md
+          fail_on_unmatched_files: true
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
